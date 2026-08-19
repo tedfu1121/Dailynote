@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=9">
+  <link rel="manifest" href="manifest.json?v=10">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,38 +14,81 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px; }
+    body { 
+      font-family: sans-serif; 
+      background-color: #f7f6f2; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      overflow: hidden; 
+      padding-top: 10px;
+    }
+    
     header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; z-index: 10; }
     .nav-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
     .sync-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #4caf50; display: inline-block; transition: background-color 0.3s; }
     .sync-indicator.syncing { background-color: #ff9800; }
+    
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
     button:active { background-color: #eae8e1; }
     
-    .viewport-container { flex: 1; width: 100%; overflow: hidden; position: relative; }
-    .carousel-track { display: flex; width: 300%; height: 100%; will-change: transform; transform: translate3d(-33.3333%, 0, 0); }
-    .month-view { width: 33.3333%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; transition: opacity 0.2s ease-out; opacity: 0.35; }
-    .month-view.active-month { opacity: 1; }
+    .viewport-container {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .carousel-track {
+      display: flex;
+      width: 300%;
+      height: 100%;
+      will-change: transform;
+      transform: translate3d(-33.3333%, 0, 0);
+    }
 
+    .month-view {
+      width: 33.3333%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      opacity: 0.38;
+      transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .month-view.active-month {
+      opacity: 1;
+    }
+    
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
     .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
     .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 1px 2px 4px 1px; }
     .day-cell.empty-cell { background-color: #f7f6f2; border: none; }
+    
     .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; line-height: 1; }
     .date-num { font-size: 10px; font-weight: 800; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
     .day-cell.today .date-num { background-color: #444; color: #fff; }
+    
     .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background-color: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .mark-btn.checked { background-color: #a33b3b; border-color: #a33b3b; }
     .mark-btn.checked::after { content: ''; width: 2px; height: 4px; border: solid white; border-width: 0 1.2px 1.2px 0; transform: rotate(45deg); margin-bottom: 1px; }
+    
     .cell-editor { flex: 1; width: 100%; border: none; font-size: 8.6px; line-height: 1.35; color: #222; resize: none; outline: none; background: transparent; font-family: inherit; padding: 0; }
+    .cell-editor::placeholder { color: #d8d6cf; }
+    
     .monthly-note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
     .monthly-note-textarea { width: 100%; height: 80px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; color: #222; background: #fff; resize: none; outline: none; font-family: inherit; }
   </style>
 </head>
 <body>
   <header>
-    <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status"></span></div>
-    <div style="display:flex; gap:6px;"><button onclick="goToCurrentMonth()">今天</button></div>
+    <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span></div>
+    <div style="display:flex; gap:6px;">
+      <button onclick="goToCurrentMonth()">今天</button>
+    </div>
   </header>
   
   <div class="viewport-container" id="viewport">
@@ -58,118 +101,251 @@
 
   <script>
     const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
+    
     let baseDate = new Date();
-    const track = document.getElementById('track'), viewport = document.getElementById('viewport');
-    let saveTimeout = null, isTransitioning = false;
+    const monthTitle = document.getElementById('month-title');
+    const syncStatus = document.getElementById('sync-status');
+    const track = document.getElementById('track');
+    const viewport = document.getElementById('viewport');
+    const viewPrev = document.getElementById('view-prev');
+    const viewCurrent = document.getElementById('view-current');
+    const viewNext = document.getElementById('view-next');
+    let saveTimeout = null;
+    let isTransitioning = false;
 
-    function populateMonthData(container, dateObj) {
-      const year = dateObj.getFullYear(), month = dateObj.getMonth() + 1;
-      const firstDay = new Date(year, month - 1, 1).getDay(), days = new Date(year, month, 0).getDate();
-      const today = new Date(), isCurM = today.getFullYear() === year && (today.getMonth() + 1) === month;
-      
-      const cells = container.querySelectorAll('.day-cell');
-      for (let i = 0; i < 42; i++) {
-        const cell = cells[i], day = i - firstDay + 1;
-        if (i < firstDay || i >= firstDay + days) {
-          cell.className = 'day-cell empty-cell';
-          cell.querySelector('.date-num').innerText = '';
-          cell.querySelector('.mark-btn').style.display = 'none';
-          cell.querySelector('.cell-editor').style.display = 'none';
-        } else {
-          const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          cell.className = `day-cell ${(isCurM && today.getDate() === day) ? 'today' : ''}`;
-          cell.querySelector('.date-num').innerText = day;
-          const btn = cell.querySelector('.mark-btn'), tx = cell.querySelector('.cell-editor');
-          btn.style.display = 'flex'; tx.style.display = 'block';
-          btn.className = `mark-btn ${localStorage.getItem('mark_'+dateKey) === '1' ? 'checked' : ''}`;
-          btn.setAttribute('data-key', dateKey);
-          tx.setAttribute('data-key', dateKey);
-          tx.value = localStorage.getItem('note_'+dateKey) || '';
-        }
-      }
-      const noteBox = container.querySelector('.monthly-note-textarea');
-      noteBox.setAttribute('data-monthkey', `note_monthly_${year}_${String(month).padStart(2, '0')}`);
-      noteBox.value = localStorage.getItem(noteBox.getAttribute('data-monthkey')) || '';
+    function formatDateKey(year, month, day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
 
-    function initSkeleton(container) {
+    function setSyncState(isSyncing) {
+      syncStatus.classList.toggle('syncing', isSyncing);
+    }
+
+    function syncToCloud(key, val) {
+      if (!CLOUD_API_URL) return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key, val: val })
+      }).then(() => {
+        setTimeout(() => setSyncState(false), 400);
+      }).catch(() => setSyncState(false));
+    }
+
+    function fetchCloudData() {
+      if (!CLOUD_API_URL) return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL)
+        .then(res => res.json())
+        .then(data => {
+          Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
+          renderAllMonths();
+          setSyncState(false);
+        })
+        .catch(() => setSyncState(false));
+    }
+
+    function initMonthViewSkeleton(container) {
       let html = `<div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div><div class="month-grid">`;
-      for(let i=0; i<42; i++) html += `<div class="day-cell"><div class="day-header"><span class="date-num"></span><button class="mark-btn"></button></div><textarea class="cell-editor"></textarea></div>`;
-      html += `</div><div class="monthly-note-box"><textarea class="monthly-note-textarea"></textarea></div>`;
+      for (let i = 0; i < 42; i++) {
+        html += `
+          <div class="day-cell" data-idx="${i}">
+            <div class="day-header">
+              <span class="date-num"></span>
+              <button class="mark-btn" data-key=""></button>
+            </div>
+            <textarea class="cell-editor" placeholder="" data-key=""></textarea>
+          </div>`;
+      }
+      html += `</div>
+        <div class="monthly-note-box">
+          <textarea class="monthly-note-textarea" placeholder="其他" data-monthkey=""></textarea>
+        </div>`;
       container.innerHTML = html;
     }
 
-    function renderAll() {
-      document.getElementById('month-title').innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth()+1} 月`;
-      populateMonthData(document.getElementById('view-prev'), new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
-      populateMonthData(document.getElementById('view-current'), baseDate);
-      populateMonthData(document.getElementById('view-next'), new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
+    function populateMonthData(container, dateObj) {
+      const year = dateObj.getFullYear();
+      const month = dateObj.getMonth() + 1;
+      const firstDayIndex = new Date(year, month - 1, 1).getDay();
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const today = new Date();
+      const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
+
+      const cells = container.querySelectorAll('.day-cell');
+      for (let i = 0; i < 42; i++) {
+        const cell = cells[i];
+        const dateNum = cell.querySelector('.date-num');
+        const markBtn = cell.querySelector('.mark-btn');
+        const textarea = cell.querySelector('.cell-editor');
+
+        if (i < firstDayIndex || i >= firstDayIndex + daysInMonth) {
+          cell.className = 'day-cell empty-cell';
+          dateNum.innerText = '';
+          markBtn.style.display = 'none';
+          textarea.style.display = 'none';
+          textarea.value = '';
+          textarea.setAttribute('data-key', '');
+          markBtn.setAttribute('data-key', '');
+        } else {
+          const day = i - firstDayIndex + 1;
+          const dateKey = formatDateKey(year, month, day);
+          const isToday = isCurrentMonth && today.getDate() === day;
+          const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
+
+          cell.className = `day-cell ${isToday ? 'today' : ''}`;
+          dateNum.innerText = day;
+          markBtn.style.display = 'flex';
+          textarea.style.display = 'block';
+          
+          markBtn.className = `mark-btn ${isMarked ? 'checked' : ''}`;
+          markBtn.setAttribute('data-key', dateKey);
+          
+          textarea.setAttribute('data-key', dateKey);
+          textarea.value = localStorage.getItem(`note_${dateKey}`) || '';
+        }
+      }
+
+      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
+      const noteBox = container.querySelector('.monthly-note-textarea');
+      noteBox.setAttribute('data-monthkey', monthKey);
+      noteBox.value = localStorage.getItem(monthKey) || '';
+    }
+
+    function renderAllMonths() {
+      const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+      const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+      
+      monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
+
+      populateMonthData(viewPrev, prevDate);
+      populateMonthData(viewCurrent, baseDate);
+      populateMonthData(viewNext, nextDate);
+      
+      viewPrev.className = 'month-view';
+      viewCurrent.className = 'month-view active-month';
+      viewNext.className = 'month-view';
+
+      track.style.transition = 'none';
       track.style.transform = 'translate3d(-33.3333%, 0, 0)';
+    }
+
+    function goToCurrentMonth() {
+      baseDate = new Date();
+      renderAllMonths();
     }
 
     viewport.addEventListener('input', (e) => {
       const target = e.target;
-      if (target.classList.contains('cell-editor') || target.classList.contains('monthly-note-textarea')) {
-        const key = target.getAttribute('data-key') ? ('note_' + target.getAttribute('data-key')) : target.getAttribute('data-monthkey');
-        localStorage.setItem(key, target.value);
+      if (target.classList.contains('cell-editor')) {
+        const key = `note_${target.getAttribute('data-key')}`;
+        const val = target.value;
+        localStorage.setItem(key, val);
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-          fetch(CLOUD_API_URL, {method: "POST", mode: "no-cors", body: JSON.stringify({key, val: target.value})});
-          document.getElementById('sync-status').classList.remove('syncing');
-        }, 800);
-        document.getElementById('sync-status').classList.add('syncing');
+        saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+      } else if (target.classList.contains('monthly-note-textarea')) {
+        const key = target.getAttribute('data-monthkey');
+        const val = target.value;
+        localStorage.setItem(key, val);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
       }
     });
 
     viewport.addEventListener('click', (e) => {
       const target = e.target.closest('.mark-btn');
       if (target) {
-        const key = 'mark_' + target.getAttribute('data-key');
+        const rawKey = target.getAttribute('data-key');
+        if (!rawKey) return;
+        const key = `mark_${rawKey}`;
         target.classList.toggle('checked');
-        localStorage.setItem(key, target.classList.contains('checked') ? '1' : '0');
-        fetch(CLOUD_API_URL, {method: "POST", mode: "no-cors", body: JSON.stringify({key, val: target.classList.contains('checked') ? '1' : '0'})});
+        const val = target.classList.contains('checked') ? '1' : '0';
+        localStorage.setItem(key, val);
+        syncToCloud(key, val);
       }
     });
 
-    let startX = 0, isDragging = false, isHorizontal = null;
+    // 觸控手勢監聽（自然阻尼與平滑彈性）
+    let startX = 0, startY = 0, currentX = 0;
+    let isDragging = false, isHorizontal = null;
+    let trackWidth = 0;
+
     viewport.addEventListener('touchstart', (e) => {
       if (isTransitioning || e.target.tagName === 'TEXTAREA') return;
       startX = e.touches[0].clientX;
-      isDragging = true; isHorizontal = null;
+      startY = e.touches[0].clientY;
+      currentX = startX;
+      isDragging = true;
+      isHorizontal = null;
+      trackWidth = viewport.clientWidth;
       track.style.transition = 'none';
     }, { passive: true });
 
     viewport.addEventListener('touchmove', (e) => {
-      if (!isDragging) return;
-      const diffX = e.touches[0].clientX - startX;
-      if (isHorizontal === null) isHorizontal = Math.abs(diffX) > 5;
-      if (isHorizontal) {
-        track.style.transform = `translate3d(${-33.3333 + (diffX / viewport.clientWidth) * 100}%, 0, 0)`;
-      }
-    }, { passive: true });
+      if (!isDragging || isTransitioning) return;
+      currentX = e.touches[0].clientX;
+      const diffX = currentX - startX;
+      const diffY = e.touches[0].clientY - startY;
 
-    viewport.addEventListener('touchend', (e) => {
-      if (!isDragging || !isHorizontal) return;
+      if (isHorizontal === null) {
+        if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+          isHorizontal = Math.abs(diffX) > Math.abs(diffY);
+        }
+      }
+
+      if (isHorizontal) {
+        if (e.cancelable) e.preventDefault();
+        const percent = -33.3333 + (diffX / (trackWidth * 3)) * 100;
+        track.style.transform = `translate3d(${percent}%, 0, 0)`;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', () => {
+      if (!isDragging || !isHorizontal || isTransitioning) {
+        isDragging = false;
+        return;
+      }
       isDragging = false;
-      const diffX = e.changedTouches[0].clientX - startX;
-      track.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
       
-      // 靈敏度調整：門檻值改為 10% 螢幕寬度，更輕觸即切換
-      if (Math.abs(diffX) > viewport.clientWidth * 0.1) {
+      const diffX = currentX - startX;
+      const threshold = trackWidth * 0.14; // 14% 自然門檻
+
+      track.style.transition = 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)';
+      
+      if (diffX > threshold) {
         isTransitioning = true;
-        track.style.transform = diffX > 0 ? 'translate3d(0%, 0, 0)' : 'translate3d(-66.6666%, 0, 0)';
+        viewPrev.className = 'month-view active-month';
+        viewCurrent.className = 'month-view';
+        track.style.transform = 'translate3d(0%, 0, 0)';
         setTimeout(() => {
-          baseDate.setMonth(baseDate.getMonth() + (diffX > 0 ? -1 : 1));
-          renderAll();
+          baseDate.setMonth(baseDate.getMonth() - 1);
+          renderAllMonths();
           isTransitioning = false;
-        }, 250);
+        }, 280);
+      } else if (diffX < -threshold) {
+        isTransitioning = true;
+        viewNext.className = 'month-view active-month';
+        viewCurrent.className = 'month-view';
+        track.style.transform = 'translate3d(-66.6666%, 0, 0)';
+        setTimeout(() => {
+          baseDate.setMonth(baseDate.getMonth() + 1);
+          renderAllMonths();
+          isTransitioning = false;
+        }, 280);
       } else {
         track.style.transform = 'translate3d(-33.3333%, 0, 0)';
       }
     }, { passive: true });
 
-    ['view-prev','view-current','view-next'].forEach(id => initSkeleton(document.getElementById(id)));
-    renderAll();
+    // 初始化骨架與資料
+    initMonthViewSkeleton(viewPrev);
+    initMonthViewSkeleton(viewCurrent);
+    initMonthViewSkeleton(viewNext);
+
+    renderAllMonths();
+    fetchCloudData();
   </script>
 </body>
 </html>
