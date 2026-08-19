@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily Note</title>
-  <link rel="manifest" href="manifest.json?v=17">
+  <link rel="manifest" href="manifest.json?v=18">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px; }
-    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; z-index: 10; }
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; }
     .viewport-container { flex: 1; width: 100%; overflow: hidden; position: relative; }
     .month-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; will-change: transform, opacity; opacity: 0.38; transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
     .month-view.active-month { opacity: 1; }
@@ -19,6 +19,10 @@
     .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background: #fff; }
     .mark-btn.checked { background: #a33b3b; border-color: #a33b3b; }
     .cell-preview { font-size: 8px; color: #666; line-height: 1.2; overflow: hidden; }
+    /* 下方輸入欄 */
+    .monthly-note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
+    .monthly-note-textarea { width: 100%; height: 60px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; }
+    /* 彈出視窗 */
     #editor-modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; z-index: 100; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; padding: 20px; }
     #editor-modal.open { bottom: 0; }
     #modal-textarea { flex: 1; border: none; font-size: 15px; outline: none; width: 100%; resize: none; }
@@ -58,7 +62,9 @@
             <div class="cell-preview">${localStorage.getItem('note_'+key) || ''}</div></div>`;
         }
       }
-      p.innerHTML = html + `</div>`;
+      const mKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
+      html += `</div><div class="monthly-note-box"><textarea class="monthly-note-textarea" placeholder="其他事項" oninput="saveMonthlyNote('${mKey}', this.value)">${localStorage.getItem(mKey) || ''}</textarea></div>`;
+      p.innerHTML = html;
     }
 
     function renderAll() {
@@ -77,12 +83,15 @@
 
     function openModal(k) { activeKey = k; document.getElementById('modal-date-title').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('editor-modal').classList.add('open'); }
     function closeModal() { document.getElementById('editor-modal').classList.remove('open'); renderAll(); }
-    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
-
+    
+    function saveMonthlyNote(k, v) { localStorage.setItem(k, v); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:k, val:v})}); }
+    
     document.getElementById('modal-textarea').oninput = (e) => { 
       localStorage.setItem('note_'+activeKey, e.target.value); 
       fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})});
     };
+
+    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
 
     let startX = 0, isDragging = false;
     viewport.ontouchstart = (e) => { startX = e.touches[0].clientX; isDragging = true; };
