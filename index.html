@@ -32,7 +32,22 @@
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
     button:active { background-color: #eae8e1; }
     
-    .calendar-container { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; touch-action: pan-y; }
+    .calendar-container { 
+      flex: 1; 
+      overflow-y: auto; 
+      overflow-x: hidden; 
+      -webkit-overflow-scrolling: touch; 
+      width: 100%; 
+      touch-action: pan-y;
+      position: relative;
+    }
+
+    .slide-wrapper {
+      width: 100%;
+      will-change: transform, opacity;
+      transform: translateX(0px);
+    }
+    
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
     .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
     .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 1px 2px 4px 1px; }
@@ -62,10 +77,12 @@
   </header>
   
   <div class="calendar-container" id="scroll-wrapper">
-    <div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
-    <div class="month-grid" id="month-grid"></div>
-    <div class="monthly-note-box">
-      <textarea id="monthly-note" class="monthly-note-textarea" placeholder="其他"></textarea>
+    <div class="slide-wrapper" id="slide-wrapper">
+      <div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+      <div class="month-grid" id="month-grid"></div>
+      <div class="monthly-note-box">
+        <textarea id="monthly-note" class="monthly-note-textarea" placeholder="其他"></textarea>
+      </div>
     </div>
   </div>
 
@@ -78,6 +95,7 @@
     const syncStatus = document.getElementById('sync-status');
     const noteArea = document.getElementById('monthly-note');
     const scrollWrapper = document.getElementById('scroll-wrapper');
+    const slideWrapper = document.getElementById('slide-wrapper');
     let saveTimeout = null;
 
     function formatDateKey(year, month, day) {
@@ -215,32 +233,101 @@
 
     function goToCurrentMonth() {
       currentDate = new Date();
-      renderCalendar();
+      slideWrapper.style.transition = 'opacity 0.2s ease';
+      slideWrapper.style.opacity = '0';
+      setTimeout(() => {
+        renderCalendar();
+        slideWrapper.style.opacity = '1';
+      }, 200);
     }
 
-    // 左右滑動換月手勢監聽
-    let touchStartX = 0;
-    let touchStartY = 0;
+    // --- 自然跟手拖曳與平滑切換邏輯 ---
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let isDragging = false;
+    let isHorizontalScroll = null;
+    let isAnimating = false;
 
     scrollWrapper.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      if (isAnimating) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      currentX = startX;
+      isDragging = true;
+      isHorizontalScroll = null;
+      slideWrapper.style.transition = 'none';
+    }, { passive: true });
+
+    scrollWrapper.addEventListener('touchmove', (e) => {
+      if (!isDragging || isAnimating) return;
+      currentX = e.touches[0].clientX;
+      const diffX = currentX - startX;
+      const diffY = e.touches[0].clientY - startY;
+
+      if (isHorizontalScroll === null) {
+        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+          isHorizontalScroll = Math.abs(diffX) > Math.abs(diffY);
+        }
+      }
+
+      if (isHorizontalScroll) {
+        const opacity = Math.max(0.3, 1 - Math.abs(diffX) / (window.innerWidth * 1.5));
+        slideWrapper.style.transform = `translateX(${diffX}px)`;
+        slideWrapper.style.opacity = opacity;
+      }
     }, { passive: true });
 
     scrollWrapper.addEventListener('touchend', (e) => {
-      const touchEndX = e.changedTouches[0].clientX;
-      const touchEndY = e.changedTouches[0].clientY;
+      if (!isDragging || isAnimating) return;
+      isDragging = false;
 
-      const diffX = touchEndX - touchStartX;
-      const diffY = touchEndY - touchStartY;
+      if (!isHorizontalScroll) {
+        slideWrapper.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+        slideWrapper.style.transform = 'translateX(0px)';
+        slideWrapper.style.opacity = '1';
+        return;
+      }
 
-      // 水平滑動幅度大於 50px，且水平位移大於垂直位移時才觸發
-      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
-        if (diffX < 0) {
-          changeMonth(1); // 向左滑：下個月
-        } else {
-          changeMonth(-1); // 向右滑：上個月
-        }
+      const diffX = currentX - startX;
+      const threshold = window.innerWidth * 0.2; // 滑動超過螢幕 20% 即切換
+      const screenWidth = window.innerWidth;
+
+      if (Math.abs(diffX) > threshold) {
+        isAnimating = true;
+        const delta = diffX < 0 ? 1 : -1;
+        const exitX = diffX < 0 ? -screenWidth : screenWidth;
+        const enterX = diffX < 0 ? screenWidth : -screenWidth;
+
+        // 平滑滑出
+        slideWrapper.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.22s ease-out';
+        slideWrapper.style.transform = `translateX(${exitX}px)`;
+        slideWrapper.style.opacity = '0';
+
+        setTimeout(() => {
+          changeMonth(delta);
+          // 準備新月份進入位置
+          slideWrapper.style.transition = 'none';
+          slideWrapper.style.transform = `translateX(${enterX}px)`;
+          slideWrapper.style.opacity = '0';
+
+          // 強制重繪後平滑滑入
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              slideWrapper.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
+              slideWrapper.style.transform = 'translateX(0px)';
+              slideWrapper.style.opacity = '1';
+              setTimeout(() => {
+                isAnimating = false;
+              }, 250);
+            });
+          });
+        }, 220);
+      } else {
+        // 未達門檻平滑彈回
+        slideWrapper.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
+        slideWrapper.style.transform = 'translateX(0px)';
+        slideWrapper.style.opacity = '1';
       }
     }, { passive: true });
 
