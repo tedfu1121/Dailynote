@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>純粹月曆</title>
   
-  <link rel="manifest" href="manifest.json?v=2">
+  <link rel="manifest" href="manifest.json?v=3">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -55,6 +55,12 @@
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
+      opacity: 0.35; /* 預設非當月呈現半透明 */
+      transition: opacity 0.25s ease;
+    }
+
+    .month-view.active-month {
+      opacity: 1; /* 當前月份為完全不透明 */
     }
     
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
@@ -88,7 +94,7 @@
   <div class="viewport-container" id="viewport">
     <div class="carousel-track" id="track">
       <div class="month-view" id="view-prev"></div>
-      <div class="month-view" id="view-current"></div>
+      <div class="month-view active-month" id="view-current"></div>
       <div class="month-view" id="view-next"></div>
     </div>
   </div>
@@ -180,6 +186,12 @@
       return html;
     }
 
+    function updateActiveView(activeId) {
+      ['view-prev', 'view-current', 'view-next'].forEach(id => {
+        document.getElementById(id).classList.toggle('active-month', id === activeId);
+      });
+    }
+
     function renderViews() {
       const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
       const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
@@ -190,6 +202,8 @@
       document.getElementById('view-current').innerHTML = generateMonthHTML(baseDate);
       document.getElementById('view-next').innerHTML = generateMonthHTML(nextDate);
       
+      updateActiveView('view-current');
+
       track.style.transition = 'none';
       track.style.transform = 'translate3d(-33.3333%, 0, 0)';
     }
@@ -275,12 +289,14 @@
       track.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
       
       if (diffX > threshold) {
+        updateActiveView('view-prev');
         track.style.transform = 'translate3d(0%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
           renderViews();
         }, 220);
       } else if (diffX < -threshold) {
+        updateActiveView('view-next');
         track.style.transform = 'translate3d(-66.6666%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
