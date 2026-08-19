@@ -24,7 +24,7 @@
       padding-top: 10px;
     }
     
-    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; }
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; z-index: 10; }
     .nav-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
     .sync-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #4caf50; display: inline-block; transition: background-color 0.3s; }
     .sync-indicator.syncing { background-color: #ff9800; }
@@ -32,20 +32,30 @@
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
     button:active { background-color: #eae8e1; }
     
-    .calendar-container { 
-      flex: 1; 
-      overflow-y: auto; 
-      overflow-x: hidden; 
-      -webkit-overflow-scrolling: touch; 
-      width: 100%; 
-      touch-action: pan-y;
+    /* 調整容器為並排顯示三個月份 */
+    .viewport-container {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
       position: relative;
     }
+    
+    .carousel-track {
+      display: flex;
+      width: 300%;
+      height: 100%;
+      will-change: transform;
+      transform: translateX(-33.333%); /* 預設顯示中間的本月 */
+    }
 
-    .slide-wrapper {
-      width: 100%;
-      will-change: transform, opacity;
-      transform: translateX(0px);
+    .month-view {
+      width: 33.333%; /* 每個月份佔 1/3 的 track 寬度，也就是一個螢幕寬 */
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
     }
     
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
@@ -76,26 +86,22 @@
     </div>
   </header>
   
-  <div class="calendar-container" id="scroll-wrapper">
-    <div class="slide-wrapper" id="slide-wrapper">
-      <div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
-      <div class="month-grid" id="month-grid"></div>
-      <div class="monthly-note-box">
-        <textarea id="monthly-note" class="monthly-note-textarea" placeholder="其他"></textarea>
-      </div>
+  <div class="viewport-container" id="viewport">
+    <div class="carousel-track" id="track">
+      <div class="month-view" id="view-prev"></div>
+      <div class="month-view" id="view-current"></div>
+      <div class="month-view" id="view-next"></div>
     </div>
   </div>
 
   <script>
     const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
     
-    let currentDate = new Date();
-    const grid = document.getElementById('month-grid');
+    let baseDate = new Date(); // 當前顯示的中心月份
     const monthTitle = document.getElementById('month-title');
     const syncStatus = document.getElementById('sync-status');
-    const noteArea = document.getElementById('monthly-note');
-    const scrollWrapper = document.getElementById('scroll-wrapper');
-    const slideWrapper = document.getElementById('slide-wrapper');
+    const track = document.getElementById('track');
+    const viewport = document.getElementById('viewport');
     let saveTimeout = null;
 
     function formatDateKey(year, month, day) {
@@ -120,9 +126,7 @@
         body: JSON.stringify({ key: key, val: val })
       }).then(() => {
         setTimeout(() => setSyncState(false), 400);
-      }).catch(() => {
-        setSyncState(false);
-      });
+      }).catch(() => setSyncState(false));
     }
 
     function fetchCloudData() {
@@ -131,136 +135,140 @@
       fetch(CLOUD_API_URL)
         .then(res => res.json())
         .then(data => {
-          Object.keys(data).forEach(key => {
-            localStorage.setItem(key, data[key]);
-          });
-          renderCalendar();
+          Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
+          renderViews();
           setSyncState(false);
         })
-        .catch(() => {
-          setSyncState(false);
-        });
+        .catch(() => setSyncState(false));
     }
 
-    function renderCalendar() {
-      grid.innerHTML = '';
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      monthTitle.innerText = `${year} 年 ${month} 月`;
-      
-      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
-      noteArea.value = localStorage.getItem(monthKey) || '';
+    function generateMonthHTML(dateObj) {
+      const year = dateObj.getFullYear();
+      const month = dateObj.getMonth() + 1;
       
       const firstDayIndex = new Date(year, month - 1, 1).getDay();
       const daysInMonth = new Date(year, month, 0).getDate();
-      
       const today = new Date();
       const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
 
-      for (let i = 0; i < firstDayIndex; i++) { 
-        const emptyCell = document.createElement('div');
-        emptyCell.className = 'day-cell empty-cell';
-        grid.appendChild(emptyCell); 
+      let html = `<div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div><div class="month-grid">`;
+      
+      for (let i = 0; i < firstDayIndex; i++) {
+        html += `<div class="day-cell empty-cell"></div>`;
       }
       
       for (let day = 1; day <= daysInMonth; day++) {
+        const dateKey = formatDateKey(year, month, day);
         const isToday = isCurrentMonth && today.getDate() === day;
-        grid.appendChild(createCell(year, month, day, isToday));
-      }
+        const savedText = localStorage.getItem(`note_${dateKey}`) || '';
+        const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
 
-      document.querySelectorAll('.cell-editor').forEach(textarea => {
+        html += `
+          <div class="day-cell ${isToday ? 'today' : ''}">
+            <div class="day-header">
+              <span class="date-num">${day}</span>
+              <button class="mark-btn ${isMarked ? 'checked' : ''}" data-key="${dateKey}"></button>
+            </div>
+            <textarea class="cell-editor" placeholder="" data-key="${dateKey}">${savedText}</textarea>
+          </div>`;
+      }
+      html += `</div>`;
+      
+      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
+      const savedMonthlyNote = localStorage.getItem(monthKey) || '';
+      
+      html += `
+        <div class="monthly-note-box">
+          <textarea class="monthly-note-textarea" placeholder="其他" data-monthkey="${monthKey}">${savedMonthlyNote}</textarea>
+        </div>`;
+      
+      return html;
+    }
+
+    function attachListeners(container) {
+      container.querySelectorAll('.cell-editor').forEach(textarea => {
         textarea.addEventListener('input', (e) => {
           const key = `note_${e.target.getAttribute('data-key')}`;
           const val = e.target.value;
           localStorage.setItem(key, val);
-
           clearTimeout(saveTimeout);
-          saveTimeout = setTimeout(() => {
-            syncToCloud(key, val);
-          }, 800);
+          saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
         });
       });
 
-      document.querySelectorAll('.mark-btn').forEach(btn => {
+      container.querySelectorAll('.mark-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const target = e.currentTarget;
           const rawKey = target.getAttribute('data-key');
           const key = `mark_${rawKey}`;
           target.classList.toggle('checked');
-          const isChecked = target.classList.contains('checked');
-          const val = isChecked ? '1' : '0';
+          const val = target.classList.contains('checked') ? '1' : '0';
           localStorage.setItem(key, val);
           syncToCloud(key, val);
         });
       });
-    }
-
-    function createCell(year, month, day, isToday = false) {
-      const dateKey = formatDateKey(year, month, day);
-      const cell = document.createElement('div');
-      cell.className = `day-cell ${isToday ? 'today' : ''}`;
       
-      const savedText = localStorage.getItem(`note_${dateKey}`) || '';
-      const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
-
-      cell.innerHTML = `
-        <div class="day-header">
-          <span class="date-num">${day}</span>
-          <button class="mark-btn ${isMarked ? 'checked' : ''}" data-key="${dateKey}"></button>
-        </div>
-        <textarea class="cell-editor" placeholder="" data-key="${dateKey}">${savedText}</textarea>
-      `;
-      return cell;
+      container.querySelectorAll('.monthly-note-textarea').forEach(textarea => {
+         textarea.addEventListener('input', (e) => {
+            const key = e.target.getAttribute('data-monthkey');
+            const val = e.target.value;
+            localStorage.setItem(key, val);
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+         });
+      });
     }
 
-    noteArea.addEventListener('input', (e) => {
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
-      const val = e.target.value;
-      localStorage.setItem(monthKey, val);
+    function renderViews() {
+      const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+      const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+      
+      monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-      clearTimeout(saveTimeout);
-      saveTimeout = setTimeout(() => {
-        syncToCloud(monthKey, val);
-      }, 800);
-    });
+      const viewPrev = document.getElementById('view-prev');
+      const viewCurrent = document.getElementById('view-current');
+      const viewNext = document.getElementById('view-next');
 
-    function changeMonth(delta) {
-      currentDate.setMonth(currentDate.getMonth() + delta);
-      renderCalendar();
+      viewPrev.innerHTML = generateMonthHTML(prevDate);
+      viewCurrent.innerHTML = generateMonthHTML(baseDate);
+      viewNext.innerHTML = generateMonthHTML(nextDate);
+
+      attachListeners(viewPrev);
+      attachListeners(viewCurrent);
+      attachListeners(viewNext);
+      
+      track.style.transition = 'none';
+      track.style.transform = 'translateX(-33.333%)';
     }
 
     function goToCurrentMonth() {
-      currentDate = new Date();
-      slideWrapper.style.transition = 'opacity 0.2s ease';
-      slideWrapper.style.opacity = '0';
-      setTimeout(() => {
-        renderCalendar();
-        slideWrapper.style.opacity = '1';
-      }, 200);
+      baseDate = new Date();
+      renderViews();
     }
 
-    // --- 自然跟手拖曳與平滑切換邏輯 ---
+    // 滑動邏輯
     let startX = 0;
     let startY = 0;
     let currentX = 0;
     let isDragging = false;
     let isHorizontalScroll = null;
-    let isAnimating = false;
+    let trackWidth = 0;
 
-    scrollWrapper.addEventListener('touchstart', (e) => {
-      if (isAnimating) return;
+    viewport.addEventListener('touchstart', (e) => {
+      // 忽略在 textarea 上的滑動，避免跟打字捲動衝突
+      if(e.target.tagName.toLowerCase() === 'textarea') return; 
+      
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       currentX = startX;
       isDragging = true;
       isHorizontalScroll = null;
-      slideWrapper.style.transition = 'none';
+      trackWidth = viewport.clientWidth;
+      track.style.transition = 'none';
     }, { passive: true });
 
-    scrollWrapper.addEventListener('touchmove', (e) => {
-      if (!isDragging || isAnimating) return;
+    viewport.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
       currentX = e.touches[0].clientX;
       const diffX = currentX - startX;
       const diffY = e.touches[0].clientY - startY;
@@ -272,62 +280,42 @@
       }
 
       if (isHorizontalScroll) {
-        const opacity = Math.max(0.3, 1 - Math.abs(diffX) / (window.innerWidth * 1.5));
-        slideWrapper.style.transform = `translateX(${diffX}px)`;
-        slideWrapper.style.opacity = opacity;
+        if(e.cancelable) e.preventDefault(); // 防止橫向滑動時觸發瀏覽器上一頁/下一頁手勢
+        // 計算位移百分比 (相對於 track 的總寬度，總寬度是 viewport 的 3 倍)
+        const percentMoved = (diffX / (trackWidth * 3)) * 100;
+        track.style.transform = `translateX(calc(-33.333% + ${percentMoved}%))`;
       }
-    }, { passive: true });
+    }, { passive: false }); // 需設為 false 才能 preventDefault
 
-    scrollWrapper.addEventListener('touchend', (e) => {
-      if (!isDragging || isAnimating) return;
+    viewport.addEventListener('touchend', (e) => {
+      if (!isDragging || !isHorizontalScroll) {
+         isDragging = false;
+         return;
+      }
       isDragging = false;
-
-      if (!isHorizontalScroll) {
-        slideWrapper.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
-        slideWrapper.style.transform = 'translateX(0px)';
-        slideWrapper.style.opacity = '1';
-        return;
-      }
-
+      
       const diffX = currentX - startX;
-      const threshold = window.innerWidth * 0.2; // 滑動超過螢幕 20% 即切換
-      const screenWidth = window.innerWidth;
+      const threshold = trackWidth * 0.25; // 滑動超過 25% 螢幕寬度則換月
 
-      if (Math.abs(diffX) > threshold) {
-        isAnimating = true;
-        const delta = diffX < 0 ? 1 : -1;
-        const exitX = diffX < 0 ? -screenWidth : screenWidth;
-        const enterX = diffX < 0 ? screenWidth : -screenWidth;
-
-        // 平滑滑出
-        slideWrapper.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.22s ease-out';
-        slideWrapper.style.transform = `translateX(${exitX}px)`;
-        slideWrapper.style.opacity = '0';
-
+      track.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+      
+      if (diffX > threshold) {
+        // 滑向上個月 (向右拉)
+        track.style.transform = 'translateX(0%)';
         setTimeout(() => {
-          changeMonth(delta);
-          // 準備新月份進入位置
-          slideWrapper.style.transition = 'none';
-          slideWrapper.style.transform = `translateX(${enterX}px)`;
-          slideWrapper.style.opacity = '0';
-
-          // 強制重繪後平滑滑入
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              slideWrapper.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
-              slideWrapper.style.transform = 'translateX(0px)';
-              slideWrapper.style.opacity = '1';
-              setTimeout(() => {
-                isAnimating = false;
-              }, 250);
-            });
-          });
-        }, 220);
+          baseDate.setMonth(baseDate.getMonth() - 1);
+          renderViews();
+        }, 300);
+      } else if (diffX < -threshold) {
+        // 滑向下個月 (向左拉)
+        track.style.transform = 'translateX(-66.666%)';
+        setTimeout(() => {
+          baseDate.setMonth(baseDate.getMonth() + 1);
+          renderViews();
+        }, 300);
       } else {
-        // 未達門檻平滑彈回
-        slideWrapper.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
-        slideWrapper.style.transform = 'translateX(0px)';
-        slideWrapper.style.opacity = '1';
+        // 彈回原位
+        track.style.transform = 'translateX(-33.333%)';
       }
     }, { passive: true });
 
@@ -335,7 +323,7 @@
       navigator.serviceWorker.register('sw.js');
     }
 
-    renderCalendar();
+    renderViews();
     fetchCloudData();
   </script>
 </body>
