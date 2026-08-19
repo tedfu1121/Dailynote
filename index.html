@@ -6,7 +6,7 @@
   <title>純粹月曆</title>
   
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="https://img.icons8.com/fluency-systems-filled/512/calendar-1.png">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -30,10 +30,9 @@
     .sync-indicator.syncing { background-color: #ff9800; }
     
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
-    .arrow-btn { font-weight: 700; padding: 5px 10px; }
     button:active { background-color: #eae8e1; }
     
-    .calendar-container { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; }
+    .calendar-container { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; touch-action: pan-y; }
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
     .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
     .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 1px 2px 4px 1px; }
@@ -58,13 +57,11 @@
   <header>
     <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span></div>
     <div style="display:flex; gap:6px;">
-      <button class="arrow-btn" onclick="changeMonth(-1)">❮</button>
       <button onclick="goToCurrentMonth()">今天</button>
-      <button class="arrow-btn" onclick="changeMonth(1)">❯</button>
     </div>
   </header>
   
-  <div class="calendar-container">
+  <div class="calendar-container" id="scroll-wrapper">
     <div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
     <div class="month-grid" id="month-grid"></div>
     <div class="monthly-note-box">
@@ -80,6 +77,7 @@
     const monthTitle = document.getElementById('month-title');
     const syncStatus = document.getElementById('sync-status');
     const noteArea = document.getElementById('monthly-note');
+    const scrollWrapper = document.getElementById('scroll-wrapper');
     let saveTimeout = null;
 
     function formatDateKey(year, month, day) {
@@ -219,6 +217,32 @@
       currentDate = new Date();
       renderCalendar();
     }
+
+    // 左右滑動換月手勢監聽
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    scrollWrapper.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    scrollWrapper.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+
+      const diffX = touchEndX - touchStartX;
+      const diffY = touchEndY - touchStartY;
+
+      // 水平滑動幅度大於 50px，且水平位移大於垂直位移時才觸發
+      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX < 0) {
+          changeMonth(1); // 向左滑：下個月
+        } else {
+          changeMonth(-1); // 向右滑：上個月
+        }
+      }
+    }, { passive: true });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
