@@ -2,34 +2,23 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily Note</title>
-  <link rel="manifest" href="manifest.json?v=16">
-  <meta name="theme-color" content="#f7f6f2">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json?v=17">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px; }
     header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; z-index: 10; }
-    .nav-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-    .sync-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #4caf50; display: inline-block; transition: background-color 0.3s; }
-    .sync-indicator.syncing { background-color: #ff9800; }
-    button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
-    
     .viewport-container { flex: 1; width: 100%; overflow: hidden; position: relative; }
     .month-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; will-change: transform, opacity; opacity: 0.38; transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
     .month-view.active-month { opacity: 1; }
-    
-    .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
     .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
     .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 4px; cursor: pointer; }
-    .day-cell.empty-cell { background-color: #f7f6f2; cursor: default; }
+    .day-cell.empty-cell { background-color: #f7f6f2; }
     .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-    .date-num { font-size: 10px; font-weight: 800; }
-    .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background-color: #fff; padding: 0; display: flex; align-items: center; justify-content: center; }
-    .mark-btn.checked { background-color: #a33b3b; border-color: #a33b3b; }
+    .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background: #fff; }
+    .mark-btn.checked { background: #a33b3b; border-color: #a33b3b; }
     .cell-preview { font-size: 8px; color: #666; line-height: 1.2; overflow: hidden; }
-
     #editor-modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; z-index: 100; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; padding: 20px; }
     #editor-modal.open { bottom: 0; }
     #modal-textarea { flex: 1; border: none; font-size: 15px; outline: none; width: 100%; resize: none; }
@@ -37,8 +26,8 @@
 </head>
 <body>
   <header>
-    <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status"></span></div>
-    <button onclick="baseDate = new Date(); renderAll();">今天</button>
+    <div class="nav-title"><span id="month-title">-- 年 -- 月</span></div>
+    <button onclick="baseDate=new Date(); renderAll();">今天</button>
   </header>
   <div class="viewport-container" id="viewport">
     <div class="month-view" id="p0"></div><div class="month-view active-month" id="p1"></div><div class="month-view" id="p2"></div>
@@ -51,20 +40,20 @@
 
   <script>
     const CLOUD = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
-    let baseDate = new Date(), activeKey = null, isDragging = false;
+    let baseDate = new Date(), activeKey = null;
     const panels = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2')];
     let map = [0, 1, 2];
 
     function populate(p, date) {
       const y = date.getFullYear(), m = date.getMonth()+1, first = new Date(y, m-1, 1).getDay(), days = new Date(y, m, 0).getDate();
-      let html = `<div class="weekdays-header">${'日一二三四五六'.split('').map(d=>`<div>${d}</div>`).join('')}</div><div class="month-grid">`;
+      let html = `<div class="month-grid">`;
       for(let i=0; i<42; i++) {
         const d = i - first + 1;
         if(i < first || i >= first+days) html += `<div class="day-cell empty-cell"></div>`;
         else {
           const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
           html += `<div class="day-cell" onclick="openModal('${key}')">
-            <div class="day-header"><span class="date-num">${d}</span>
+            <div class="day-header"><span style="font-weight:800;">${d}</span>
             <button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div>
             <div class="cell-preview">${localStorage.getItem('note_'+key) || ''}</div></div>`;
         }
@@ -88,25 +77,26 @@
 
     function openModal(k) { activeKey = k; document.getElementById('modal-date-title').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('editor-modal').classList.add('open'); }
     function closeModal() { document.getElementById('editor-modal').classList.remove('open'); renderAll(); }
+    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
 
     document.getElementById('modal-textarea').oninput = (e) => { 
       localStorage.setItem('note_'+activeKey, e.target.value); 
       fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})});
     };
 
-    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
-
-    // 觸控邏輯 (簡單版)
-    let startX = 0;
-    viewport.ontouchstart = (e) => startX = e.touches[0].clientX;
+    let startX = 0, isDragging = false;
+    viewport.ontouchstart = (e) => { startX = e.touches[0].clientX; isDragging = true; };
+    viewport.ontouchmove = (e) => { if(isDragging) setPos(((e.touches[0].clientX - startX)/viewport.clientWidth)*100); };
     viewport.ontouchend = (e) => {
+      isDragging = false;
       const diff = e.changedTouches[0].clientX - startX;
-      if (Math.abs(diff) < 50) return;
-      if (diff > 0) { baseDate.setMonth(baseDate.getMonth()-1); map = [map[2], map[0], map[1]]; }
-      else { baseDate.setMonth(baseDate.getMonth()+1); map = [map[1], map[2], map[0]]; }
-      renderAll();
+      if (Math.abs(diff) < 50) setPos(0);
+      else {
+        if (diff > 0) { baseDate.setMonth(baseDate.getMonth()-1); map = [map[2], map[0], map[1]]; }
+        else { baseDate.setMonth(baseDate.getMonth()+1); map = [map[1], map[2], map[0]]; }
+        renderAll();
+      }
     };
-
     renderAll();
   </script>
 </body>
