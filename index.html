@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>純粹月曆</title>
   
-  <!-- PWA 設定 -->
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
@@ -45,6 +44,22 @@
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sync-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #4caf50;
+      display: inline-block;
+      transition: background-color 0.3s;
+    }
+
+    .sync-indicator.syncing {
+      background-color: #ff9800;
     }
 
     .nav-buttons {
@@ -64,11 +79,6 @@
 
     button:active {
       background-color: #eae8e1;
-    }
-
-    .backup-btn {
-      color: #555;
-      background: #faf9f6;
     }
 
     .calendar-container {
@@ -194,11 +204,11 @@
 <body>
 
   <header>
-    <div class="nav-title" id="month-title">-- 年 -- 月</div>
+    <div class="nav-title">
+      <span id="month-title">-- 年 -- 月</span>
+      <span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span>
+    </div>
     <div class="nav-buttons">
-      <button class="backup-btn" onclick="exportData()">備份</button>
-      <button class="backup-btn" onclick="document.getElementById('import-input').click()">還原</button>
-      <input type="file" id="import-input" style="display: none;" accept=".json" onchange="importData(event)">
       <button onclick="changeMonth(-1)">上個月</button>
       <button onclick="goToCurrentMonth()">今天</button>
       <button onclick="changeMonth(1)">下個月</button>
@@ -213,12 +223,59 @@
   </div>
 
   <script>
+    // ⚠️ 請替換為你在第二步取得的 Google Apps Script 網址
+    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
+
     let currentDate = new Date();
     const grid = document.getElementById('month-grid');
     const monthTitle = document.getElementById('month-title');
+    const syncStatus = document.getElementById('sync-status');
+    let saveTimeout = null;
 
     function formatDateKey(year, month, day) {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    function setSyncState(isSyncing) {
+      if (isSyncing) {
+        syncStatus.classList.add('syncing');
+      } else {
+        syncStatus.classList.remove('syncing');
+      }
+    }
+
+    // 背景靜默同步至 Google Sheets
+    function syncToCloud(key, val) {
+      if (!CLOUD_API_URL || CLOUD_API_URL === "YOUR_GOOGLE_SCRIPT_URL_HERE") return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key, val: val })
+      }).then(() => {
+        setTimeout(() => setSyncState(false), 400);
+      }).catch(() => {
+        setSyncState(false);
+      });
+    }
+
+    // 啟動時從 Google Sheets 載入最新資料
+    function fetchCloudData() {
+      if (!CLOUD_API_URL || CLOUD_API_URL === "YOUR_GOOGLE_SCRIPT_URL_HERE") return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL)
+        .then(res => res.json())
+        .then(data => {
+          Object.keys(data).forEach(key => {
+            localStorage.setItem(key, data[key]);
+          });
+          renderCalendar();
+          setSyncState(false);
+        })
+        .catch(() => {
+          setSyncState(false);
+        });
     }
 
     function renderCalendar() {
@@ -247,18 +304,27 @@
 
       document.querySelectorAll('.cell-editor').forEach(textarea => {
         textarea.addEventListener('input', (e) => {
-          const key = e.target.getAttribute('data-key');
-          localStorage.setItem(`note_${key}`, e.target.value);
+          const key = `note_${e.target.getAttribute('data-key')}`;
+          const val = e.target.value;
+          localStorage.setItem(key, val);
+
+          clearTimeout(saveTimeout);
+          saveTimeout = setTimeout(() => {
+            syncToCloud(key, val);
+          }, 800);
         });
       });
 
       document.querySelectorAll('.mark-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const target = e.currentTarget;
-          const key = target.getAttribute('data-key');
+          const rawKey = target.getAttribute('data-key');
+          const key = `mark_${rawKey}`;
           target.classList.toggle('checked');
           const isChecked = target.classList.contains('checked');
-          localStorage.setItem(`mark_${key}`, isChecked ? '1' : '0');
+          const val = isChecked ? '1' : '0';
+          localStorage.setItem(key, val);
+          syncToCloud(key, val);
         });
       });
     }
@@ -291,50 +357,12 @@
       renderCalendar();
     }
 
-    function exportData() {
-      const backup = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key.startsWith('note_') || key.startsWith('mark_')) {
-          backup[key] = localStorage.getItem(key);
-        }
-      }
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `月曆備份_${new Date().toISOString().slice(0,10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    }
-
-    function importData(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const data = JSON.parse(e.target.result);
-          Object.keys(data).forEach(key => {
-            if (key.startsWith('note_') || key.startsWith('mark_')) {
-              localStorage.setItem(key, data[key]);
-            }
-          });
-          renderCalendar();
-          alert('還原成功');
-        } catch (err) {
-          alert('檔案格式錯誤');
-        }
-      };
-      reader.readAsText(file);
-      event.target.value = '';
-    }
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
     }
 
     renderCalendar();
+    fetchCloudData();
   </script>
 </body>
 </html>
