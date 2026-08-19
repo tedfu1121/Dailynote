@@ -13,223 +13,73 @@
   <meta name="apple-mobile-web-app-title" content="純粹月曆">
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { 
+      font-family: sans-serif; 
+      background-color: #f7f6f2; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      overflow: hidden; 
+      padding-top: 10px; /* 整體下移 10px */
     }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: #f7f6f2;
-      color: #2b2b2b;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    header {
-      padding: 8px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background-color: #f7f6f2;
-      border-bottom: 1px solid #e2e0d8;
-      flex-shrink: 0;
-    }
-
-    .nav-title {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .sync-indicator {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: #4caf50;
-      display: inline-block;
-      transition: background-color 0.3s;
-    }
-
-    .sync-indicator.syncing {
-      background-color: #ff9800;
-    }
-
-    .nav-buttons {
-      display: flex;
-      gap: 4px;
-    }
-
-    button {
-      background: #ffffff;
-      border: 1px solid #d0cecd;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 9px;
-      cursor: pointer;
-      color: #333;
-    }
-
-    button:active {
-      background-color: #eae8e1;
-    }
-
-    .calendar-container {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      -webkit-overflow-scrolling: touch;
-      width: 100%;
-    }
-
-    .weekdays-header {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      background: #f0eee8;
-      border-bottom: 1px solid #e2e0d8;
-      font-size: 7.8px;
-      font-weight: 600;
-      text-align: center;
-      color: #666;
-      padding: 6px 0;
-      width: 100%;
-    }
-
-    .month-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      width: 100%;
-      background-color: #e5e3dc;
-      gap: 1px;
-      padding-bottom: 30px;
-    }
-
-    .day-cell {
-      background-color: #ffffff;
-      min-height: 82.5px;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      padding: 1px 2px 4px 1px;
-    }
-
-    .day-cell.empty-cell {
-      background-color: #f7f6f2;
-      border: none;
-    }
-
-    .day-header {
-      background: transparent;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0;
-      margin-bottom: 2px;
-      line-height: 1;
-    }
-
-    .date-num {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: #111;
-      line-height: 1;
-      width: 13px;
-      height: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-    }
-
-    .day-cell.today .date-num {
-      background-color: #444444;
-      color: #ffffff;
-    }
-
-    .mark-btn {
-      width: 10px;
-      height: 10px;
-      border: 1px solid #ccc;
-      border-radius: 50%;
-      background-color: #ffffff;
-      padding: 0;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .mark-btn.checked {
-      background-color: #a33b3b;
-      border-color: #a33b3b;
-    }
-
-    .mark-btn.checked::after {
-      content: '';
-      width: 2px;
-      height: 4px;
-      border: solid white;
-      border-width: 0 1.2px 1.2px 0;
-      transform: rotate(45deg);
-      margin-bottom: 1px;
-    }
-
-    .cell-editor {
-      flex: 1;
-      width: 100%;
-      border: none;
-      font-size: 8.6px;
-      line-height: 1.35;
-      color: #222;
-      resize: none;
-      outline: none;
-      background: transparent;
-      font-family: inherit;
-      padding: 0;
-    }
-
-    .cell-editor::placeholder {
-      color: #d8d6cf;
-    }
+    
+    /* 放大版橫幅樣式 */
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; }
+    .nav-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .sync-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #4caf50; display: inline-block; transition: background-color 0.3s; }
+    .sync-indicator.syncing { background-color: #ff9800; }
+    
+    button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
+    button:active { background-color: #eae8e1; }
+    
+    .calendar-container { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; }
+    .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
+    .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 1px 2px 4px 1px; }
+    .day-cell.empty-cell { background-color: #f7f6f2; border: none; }
+    
+    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; line-height: 1; }
+    .date-num { font-size: 10px; font-weight: 800; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+    .day-cell.today .date-num { background-color: #444; color: #fff; }
+    
+    .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background-color: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mark-btn.checked { background-color: #a33b3b; border-color: #a33b3b; }
+    .mark-btn.checked::after { content: ''; width: 2px; height: 4px; border: solid white; border-width: 0 1.2px 1.2px 0; transform: rotate(45deg); margin-bottom: 1px; }
+    
+    .cell-editor { flex: 1; width: 100%; border: none; font-size: 8.6px; line-height: 1.35; color: #222; resize: none; outline: none; background: transparent; font-family: inherit; padding: 0; }
+    .cell-editor::placeholder { color: #d8d6cf; }
+    
+    .monthly-note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
+    .monthly-note-textarea { width: 100%; height: 80px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; color: #222; background: #fff; resize: none; outline: none; font-family: inherit; }
   </style>
 </head>
 <body>
-
   <header>
-    <div class="nav-title">
-      <span id="month-title">-- 年 -- 月</span>
-      <span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span>
-    </div>
-    <div class="nav-buttons">
+    <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span></div>
+    <div style="display:flex; gap:6px;">
       <button onclick="changeMonth(-1)">上個月</button>
       <button onclick="goToCurrentMonth()">今天</button>
       <button onclick="changeMonth(1)">下個月</button>
     </div>
   </header>
-
-  <div class="calendar-container" id="scroll-wrapper">
-    <div class="weekdays-header">
-      <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-    </div>
+  
+  <div class="calendar-container">
+    <div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
     <div class="month-grid" id="month-grid"></div>
+    <div class="monthly-note-box">
+      <textarea id="monthly-note" class="monthly-note-textarea" placeholder="本月重要事項、待辦清單..."></textarea>
+    </div>
   </div>
 
   <script>
-    // ⚠️ 請替換為你在第二步取得的 Google Apps Script 網址
-    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
-
+    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
+    
     let currentDate = new Date();
     const grid = document.getElementById('month-grid');
     const monthTitle = document.getElementById('month-title');
     const syncStatus = document.getElementById('sync-status');
+    const noteArea = document.getElementById('monthly-note');
     let saveTimeout = null;
 
     function formatDateKey(year, month, day) {
@@ -244,9 +94,8 @@
       }
     }
 
-    // 背景靜默同步至 Google Sheets
     function syncToCloud(key, val) {
-      if (!CLOUD_API_URL || CLOUD_API_URL === "YOUR_GOOGLE_SCRIPT_URL_HERE") return;
+      if (!CLOUD_API_URL) return;
       setSyncState(true);
       fetch(CLOUD_API_URL, {
         method: "POST",
@@ -260,9 +109,8 @@
       });
     }
 
-    // 啟動時從 Google Sheets 載入最新資料
     function fetchCloudData() {
-      if (!CLOUD_API_URL || CLOUD_API_URL === "YOUR_GOOGLE_SCRIPT_URL_HERE") return;
+      if (!CLOUD_API_URL) return;
       setSyncState(true);
       fetch(CLOUD_API_URL)
         .then(res => res.json())
@@ -282,21 +130,23 @@
       grid.innerHTML = '';
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-
       monthTitle.innerText = `${year} 年 ${month} 月`;
-
+      
+      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
+      noteArea.value = localStorage.getItem(monthKey) || '';
+      
       const firstDayIndex = new Date(year, month - 1, 1).getDay();
       const daysInMonth = new Date(year, month, 0).getDate();
-
+      
       const today = new Date();
       const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
 
-      for (let i = 0; i < firstDayIndex; i++) {
+      for (let i = 0; i < firstDayIndex; i++) { 
         const emptyCell = document.createElement('div');
         emptyCell.className = 'day-cell empty-cell';
-        grid.appendChild(emptyCell);
+        grid.appendChild(emptyCell); 
       }
-
+      
       for (let day = 1; day <= daysInMonth; day++) {
         const isToday = isCurrentMonth && today.getDate() === day;
         grid.appendChild(createCell(year, month, day, isToday));
@@ -346,6 +196,19 @@
       `;
       return cell;
     }
+
+    noteArea.addEventListener('input', (e) => {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
+      const val = e.target.value;
+      localStorage.setItem(monthKey, val);
+
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        syncToCloud(monthKey, val);
+      }, 800);
+    });
 
     function changeMonth(delta) {
       currentDate.setMonth(currentDate.getMonth() + delta);
