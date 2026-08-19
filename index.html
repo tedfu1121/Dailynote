@@ -2,27 +2,31 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Daily Note</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e0d8; background: #f7f6f2; }
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e0d8; background: #f7f6f2; flex-shrink: 0; }
+    
     .viewport { flex: 1; position: relative; overflow: hidden; }
-    .panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; will-change: transform; transition: opacity 0.2s; opacity: 0.38; }
+    .panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; will-change: transform; opacity: 0.38; transition: opacity 0.2s; }
     .panel.active { opacity: 1; }
-    .grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #e5e3dc; gap: 1px; }
-    .cell { background: #fff; min-height: 80px; padding: 4px; display: flex; flex-direction: column; }
+    
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background: #e5e3dc; gap: 1px; flex-grow: 1; }
+    .cell { background: #fff; min-height: 80px; padding: 4px; display: flex; flex-direction: column; cursor: pointer; }
     .cell.empty { background: #f7f6f2; }
-    .day-header { display: flex; justify-content: space-between; align-items: center; }
+    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
     .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background: #fff; }
     .mark-btn.checked { background: #a33b3b; border-color: #a33b3b; }
-    .preview { font-size: 8px; color: #666; margin-top: 2px; }
-    .note-box { padding: 10px; background: #e5e3dc; }
-    .note-input { width: 100%; height: 60px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; }
-    #modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s; padding: 20px; display: flex; flex-direction: column; }
+    .preview { font-size: 8px; color: #666; line-height: 1.2; overflow: hidden; flex: 1; }
+    
+    .note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
+    .note-input { width: 100%; height: 50px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; resize: none; }
+    
+    #modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; z-index: 100; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; padding: 20px; }
     #modal.open { bottom: 0; }
-    #modal-textarea { flex: 1; border: none; font-size: 16px; outline: none; resize: none; }
+    #modal-textarea { flex: 1; border: none; font-size: 15px; outline: none; width: 100%; resize: none; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -33,7 +37,11 @@
   <div class="viewport" id="viewport">
     <div class="panel" id="p0"></div><div class="panel active" id="p1"></div><div class="panel" id="p2"></div>
   </div>
-  <div id="modal"><div id="modal-date" style="font-weight:bold; margin-bottom:10px;"></div><textarea id="modal-textarea"></textarea><button onclick="closeModal()" style="padding:10px;">儲存</button></div>
+  <div id="modal">
+    <div style="font-weight:bold; margin-bottom:10px;" id="modal-date-title"></div>
+    <textarea id="modal-textarea"></textarea>
+    <button onclick="closeModal()" style="padding:12px; background:#444; color:#fff; border-radius:8px;">儲存並關閉</button>
+  </div>
 
   <script>
     const CLOUD = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
@@ -47,15 +55,13 @@
       p.innerHTML = html;
     }
 
-    function updatePanel(p, date) {
+    function populate(p, date) {
       const y = date.getFullYear(), m = date.getMonth()+1, first = new Date(y, m-1, 1).getDay(), days = new Date(y, m, 0).getDate();
       const cells = p.querySelectorAll('.cell');
       const noteInput = p.querySelector('.note-input');
-      const noteKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
-      
-      noteInput.value = localStorage.getItem(noteKey) || '';
-      noteInput.oninput = (e) => { localStorage.setItem(noteKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:noteKey, val:e.target.value})}); };
-
+      const mKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
+      noteInput.value = localStorage.getItem(mKey) || '';
+      noteInput.oninput = (e) => { localStorage.setItem(mKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:mKey, val:e.target.value})}); };
       cells.forEach((cell, i) => {
         const d = i - first + 1;
         if(i < first || i >= first+days) { cell.innerHTML = ''; cell.className = 'cell empty'; }
@@ -63,39 +69,50 @@
           const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
           cell.className = 'cell';
           cell.onclick = () => openModal(key);
-          cell.innerHTML = `<div class="day-header"><span>${d}</span><button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div><div class="preview">${localStorage.getItem('note_'+key)||''}</div>`;
+          cell.innerHTML = `<div class="day-header"><span style="font-weight:800;">${d}</span><button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div><div class="preview">${localStorage.getItem('note_'+key)||''}</div>`;
         }
       });
     }
 
     function renderAll() {
       document.getElementById('month-title').innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth()+1} 月`;
-      updatePanel(panels[map[0]], new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
-      updatePanel(panels[map[1]], baseDate);
-      updatePanel(panels[map[2]], new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
+      populate(panels[map[0]], new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
+      populate(panels[map[1]], baseDate);
+      populate(panels[map[2]], new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
       setPos(0);
     }
 
-    function setPos(off) {
+    function setPos(off, trans = 'none') {
+      panels[map[0]].style.transition = trans; panels[map[1]].style.transition = trans; panels[map[2]].style.transition = trans;
       panels[map[0]].style.transform = `translate3d(${-100+off}%,0,0)`;
       panels[map[1]].style.transform = `translate3d(${off}%,0,0)`;
       panels[map[2]].style.transform = `translate3d(${100+off}%,0,0)`;
     }
 
-    function openModal(k) { activeKey = k; document.getElementById('modal-date').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('modal').classList.add('open'); }
+    function openModal(k) { activeKey = k; document.getElementById('modal-date-title').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('modal').classList.add('open'); }
     function closeModal() { document.getElementById('modal').classList.remove('open'); renderAll(); }
-    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
-    document.getElementById('modal-textarea').oninput = (e) => { localStorage.setItem('note_'+activeKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})}); };
 
-    let startX = 0;
-    document.getElementById('viewport').ontouchstart = (e) => startX = e.touches[0].clientX;
+    document.getElementById('modal-textarea').oninput = (e) => { 
+      localStorage.setItem('note_'+activeKey, e.target.value); 
+      fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})});
+    };
+
+    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
+
+    let startX = 0, isDragging = false;
+    document.getElementById('viewport').ontouchstart = (e) => { startX = e.touches[0].clientX; isDragging = true; };
+    document.getElementById('viewport').ontouchmove = (e) => { if(isDragging) setPos(((e.touches[0].clientX - startX)/viewport.clientWidth)*100); };
     document.getElementById('viewport').ontouchend = (e) => {
+      isDragging = false;
       const diff = e.changedTouches[0].clientX - startX;
-      if (Math.abs(diff) < 50) setPos(0);
+      if (Math.abs(diff) < 50) setPos(0, 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)');
       else {
-        if (diff > 0) { baseDate.setMonth(baseDate.getMonth()-1); map = [map[2], map[0], map[1]]; }
-        else { baseDate.setMonth(baseDate.getMonth()+1); map = [map[1], map[2], map[0]]; }
-        renderAll();
+        setPos(diff > 0 ? 100 : -100, 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)');
+        setTimeout(() => {
+          if (diff > 0) { baseDate.setMonth(baseDate.getMonth()-1); map = [map[2], map[0], map[1]]; }
+          else { baseDate.setMonth(baseDate.getMonth()+1); map = [map[1], map[2], map[0]]; }
+          renderAll();
+        }, 250);
       }
     };
 
