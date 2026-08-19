@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=11">
+  <link rel="manifest" href="manifest.json?v=12">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -267,7 +267,7 @@
       }
     });
 
-    // 觸控手勢監聽（全區域支援 + 高靈敏度）
+    // 觸控手勢監聽
     let startX = 0, startY = 0, currentX = 0;
     let isDragging = false, isHorizontal = null;
     let trackWidth = 0;
@@ -310,7 +310,7 @@
       isDragging = false;
       
       const diffX = currentX - startX;
-      const threshold = trackWidth * 0.10; // 10% 靈敏門檻
+      const threshold = trackWidth * 0.10;
 
       track.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
       
@@ -321,8 +321,20 @@
         track.style.transform = 'translate3d(0%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
+          
+          // 暫時關閉透明度動畫以防止重置閃爍
+          viewPrev.style.transition = 'none';
+          viewCurrent.style.transition = 'none';
+          viewNext.style.transition = 'none';
+
           renderAllMonths();
-          isTransitioning = false;
+
+          requestAnimationFrame(() => {
+            viewPrev.style.transition = '';
+            viewCurrent.style.transition = '';
+            viewNext.style.transition = '';
+            isTransitioning = false;
+          });
         }, 250);
       } else if (diffX < -threshold) {
         isTransitioning = true;
@@ -331,8 +343,20 @@
         track.style.transform = 'translate3d(-66.6666%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
+
+          // 暫時關閉透明度動畫以防止重置閃爍
+          viewPrev.style.transition = 'none';
+          viewCurrent.style.transition = 'none';
+          viewNext.style.transition = 'none';
+
           renderAllMonths();
-          isTransitioning = false;
+
+          requestAnimationFrame(() => {
+            viewPrev.style.transition = '';
+            viewCurrent.style.transition = '';
+            viewNext.style.transition = '';
+            isTransitioning = false;
+          });
         }, 250);
       } else {
         track.style.transform = 'translate3d(-33.3333%, 0, 0)';
