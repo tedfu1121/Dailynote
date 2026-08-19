@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=12">
+  <link rel="manifest" href="manifest.json?v=13">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -56,7 +56,7 @@
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       opacity: 0.38;
-      transition: opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .month-view.active-month {
@@ -93,9 +93,9 @@
   
   <div class="viewport-container" id="viewport">
     <div class="carousel-track" id="track">
-      <div class="month-view" id="view-prev"></div>
-      <div class="month-view active-month" id="view-current"></div>
-      <div class="month-view" id="view-next"></div>
+      <div class="month-view" id="panel-0"></div>
+      <div class="month-view active-month" id="panel-1"></div>
+      <div class="month-view" id="panel-2"></div>
     </div>
   </div>
 
@@ -107,9 +107,6 @@
     const syncStatus = document.getElementById('sync-status');
     const track = document.getElementById('track');
     const viewport = document.getElementById('viewport');
-    const viewPrev = document.getElementById('view-prev');
-    const viewCurrent = document.getElementById('view-current');
-    const viewNext = document.getElementById('view-next');
     let saveTimeout = null;
     let isTransitioning = false;
 
@@ -141,7 +138,7 @@
         .then(res => res.json())
         .then(data => {
           Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
-          renderAllMonths();
+          renderAll();
           setSyncState(false);
         })
         .catch(() => setSyncState(false));
@@ -214,19 +211,18 @@
       noteBox.value = localStorage.getItem(monthKey) || '';
     }
 
-    function renderAllMonths() {
+    function renderAll() {
+      monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
       const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
       const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
-      
-      monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-      populateMonthData(viewPrev, prevDate);
-      populateMonthData(viewCurrent, baseDate);
-      populateMonthData(viewNext, nextDate);
-      
-      viewPrev.className = 'month-view';
-      viewCurrent.className = 'month-view active-month';
-      viewNext.className = 'month-view';
+      populateMonthData(track.children[0], prevDate);
+      populateMonthData(track.children[1], baseDate);
+      populateMonthData(track.children[2], nextDate);
+
+      track.children[0].className = 'month-view';
+      track.children[1].className = 'month-view active-month';
+      track.children[2].className = 'month-view';
 
       track.style.transition = 'none';
       track.style.transform = 'translate3d(-33.3333%, 0, 0)';
@@ -234,7 +230,7 @@
 
     function goToCurrentMonth() {
       baseDate = new Date();
-      renderAllMonths();
+      renderAll();
     }
 
     viewport.addEventListener('input', (e) => {
@@ -267,7 +263,7 @@
       }
     });
 
-    // 觸控手勢監聽
+    // 觸控手勢監聽（無縫循環節點切換）
     let startX = 0, startY = 0, currentX = 0;
     let isDragging = false, isHorizontal = null;
     let trackWidth = 0;
@@ -315,59 +311,62 @@
       track.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
       
       if (diffX > threshold) {
+        // 滑向上個月（向右滑）
         isTransitioning = true;
-        viewPrev.className = 'month-view active-month';
-        viewCurrent.className = 'month-view';
+        track.children[0].className = 'month-view active-month';
+        track.children[1].className = 'month-view';
         track.style.transform = 'translate3d(0%, 0, 0)';
+
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
-          
-          // 暫時關閉透明度動畫以防止重置閃爍
-          viewPrev.style.transition = 'none';
-          viewCurrent.style.transition = 'none';
-          viewNext.style.transition = 'none';
+          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-          renderAllMonths();
+          // 將最後一個節點移到最前面，中間視圖完全不重新渲染
+          const lastChild = track.lastElementChild;
+          track.insertBefore(lastChild, track.firstElementChild);
 
-          requestAnimationFrame(() => {
-            viewPrev.style.transition = '';
-            viewCurrent.style.transition = '';
-            viewNext.style.transition = '';
-            isTransitioning = false;
-          });
+          track.style.transition = 'none';
+          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
+
+          // 僅在背景補齊新的上個月資料
+          const newPrevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+          populateMonthData(lastChild, newPrevDate);
+          lastChild.className = 'month-view';
+
+          isTransitioning = false;
         }, 250);
       } else if (diffX < -threshold) {
+        // 滑向下個月（向左滑）
         isTransitioning = true;
-        viewNext.className = 'month-view active-month';
-        viewCurrent.className = 'month-view';
+        track.children[2].className = 'month-view active-month';
+        track.children[1].className = 'month-view';
         track.style.transform = 'translate3d(-66.6666%, 0, 0)';
+
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
+          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-          // 暫時關閉透明度動畫以防止重置閃爍
-          viewPrev.style.transition = 'none';
-          viewCurrent.style.transition = 'none';
-          viewNext.style.transition = 'none';
+          // 將第一個節點移到最後面，中間視圖完全不重新渲染
+          const firstChild = track.firstElementChild;
+          track.appendChild(firstChild);
 
-          renderAllMonths();
+          track.style.transition = 'none';
+          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
 
-          requestAnimationFrame(() => {
-            viewPrev.style.transition = '';
-            viewCurrent.style.transition = '';
-            viewNext.style.transition = '';
-            isTransitioning = false;
-          });
+          // 僅在背景補齊新的下個月資料
+          const newNextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+          populateMonthData(firstChild, newNextDate);
+          firstChild.className = 'month-view';
+
+          isTransitioning = false;
         }, 250);
       } else {
         track.style.transform = 'translate3d(-33.3333%, 0, 0)';
       }
-    }, { passive: true });
+    });
 
-    initMonthViewSkeleton(viewPrev);
-    initMonthViewSkeleton(viewCurrent);
-    initMonthViewSkeleton(viewNext);
-
-    renderAllMonths();
+    ['panel-0', 'panel-1', 'panel-2'].forEach(id => initMonthViewSkeleton(document.getElementById(id)));
+    renderAll();
     fetchCloudData();
   </script>
 </body>
