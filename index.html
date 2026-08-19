@@ -4,43 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily Note</title>
-  <link rel="manifest" href="manifest.json?v=18">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px; }
-    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; }
-    .viewport-container { flex: 1; width: 100%; overflow: hidden; position: relative; }
-    .month-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; will-change: transform, opacity; opacity: 0.38; transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
-    .month-view.active-month { opacity: 1; }
-    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
-    .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 4px; cursor: pointer; }
-    .day-cell.empty-cell { background-color: #f7f6f2; }
-    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+    body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e0d8; background: #f7f6f2; }
+    .viewport { flex: 1; position: relative; overflow: hidden; }
+    .panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; will-change: transform; transition: opacity 0.2s; opacity: 0.38; }
+    .panel.active { opacity: 1; }
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #e5e3dc; gap: 1px; }
+    .cell { background: #fff; min-height: 80px; padding: 4px; display: flex; flex-direction: column; }
+    .cell.empty { background: #f7f6f2; }
+    .day-header { display: flex; justify-content: space-between; align-items: center; }
     .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background: #fff; }
     .mark-btn.checked { background: #a33b3b; border-color: #a33b3b; }
-    .cell-preview { font-size: 8px; color: #666; line-height: 1.2; overflow: hidden; }
-    /* 下方輸入欄 */
-    .monthly-note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
-    .monthly-note-textarea { width: 100%; height: 60px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; }
-    /* 彈出視窗 */
-    #editor-modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; z-index: 100; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; padding: 20px; }
-    #editor-modal.open { bottom: 0; }
-    #modal-textarea { flex: 1; border: none; font-size: 15px; outline: none; width: 100%; resize: none; }
+    .preview { font-size: 8px; color: #666; margin-top: 2px; }
+    .note-box { padding: 10px; background: #e5e3dc; }
+    .note-input { width: 100%; height: 60px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; }
+    #modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s; padding: 20px; display: flex; flex-direction: column; }
+    #modal.open { bottom: 0; }
+    #modal-textarea { flex: 1; border: none; font-size: 16px; outline: none; resize: none; }
   </style>
 </head>
 <body>
   <header>
-    <div class="nav-title"><span id="month-title">-- 年 -- 月</span></div>
+    <div id="month-title" style="font-weight:700;">--</div>
     <button onclick="baseDate=new Date(); renderAll();">今天</button>
   </header>
-  <div class="viewport-container" id="viewport">
-    <div class="month-view" id="p0"></div><div class="month-view active-month" id="p1"></div><div class="month-view" id="p2"></div>
+  <div class="viewport" id="viewport">
+    <div class="panel" id="p0"></div><div class="panel active" id="p1"></div><div class="panel" id="p2"></div>
   </div>
-  <div id="editor-modal">
-    <div style="font-weight:bold; margin-bottom:10px;" id="modal-date-title"></div>
-    <textarea id="modal-textarea"></textarea>
-    <button onclick="closeModal()" style="padding:12px; background:#444; color:#fff; border-radius:8px;">儲存</button>
-  </div>
+  <div id="modal"><div id="modal-date" style="font-weight:bold; margin-bottom:10px;"></div><textarea id="modal-textarea"></textarea><button onclick="closeModal()" style="padding:10px;">儲存</button></div>
 
   <script>
     const CLOUD = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
@@ -48,30 +41,38 @@
     const panels = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2')];
     let map = [0, 1, 2];
 
-    function populate(p, date) {
+    function createLayout(p) {
+      let html = `<div class="grid">` + Array(42).fill(0).map((_,i) => `<div class="cell" data-idx="${i}"></div>`).join('') + `</div>`;
+      html += `<div class="note-box"><textarea class="note-input" placeholder="其他事項"></textarea></div>`;
+      p.innerHTML = html;
+    }
+
+    function updatePanel(p, date) {
       const y = date.getFullYear(), m = date.getMonth()+1, first = new Date(y, m-1, 1).getDay(), days = new Date(y, m, 0).getDate();
-      let html = `<div class="month-grid">`;
-      for(let i=0; i<42; i++) {
+      const cells = p.querySelectorAll('.cell');
+      const noteInput = p.querySelector('.note-input');
+      const noteKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
+      
+      noteInput.value = localStorage.getItem(noteKey) || '';
+      noteInput.oninput = (e) => { localStorage.setItem(noteKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:noteKey, val:e.target.value})}); };
+
+      cells.forEach((cell, i) => {
         const d = i - first + 1;
-        if(i < first || i >= first+days) html += `<div class="day-cell empty-cell"></div>`;
+        if(i < first || i >= first+days) { cell.innerHTML = ''; cell.className = 'cell empty'; }
         else {
           const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-          html += `<div class="day-cell" onclick="openModal('${key}')">
-            <div class="day-header"><span style="font-weight:800;">${d}</span>
-            <button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div>
-            <div class="cell-preview">${localStorage.getItem('note_'+key) || ''}</div></div>`;
+          cell.className = 'cell';
+          cell.onclick = () => openModal(key);
+          cell.innerHTML = `<div class="day-header"><span>${d}</span><button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div><div class="preview">${localStorage.getItem('note_'+key)||''}</div>`;
         }
-      }
-      const mKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
-      html += `</div><div class="monthly-note-box"><textarea class="monthly-note-textarea" placeholder="其他事項" oninput="saveMonthlyNote('${mKey}', this.value)">${localStorage.getItem(mKey) || ''}</textarea></div>`;
-      p.innerHTML = html;
+      });
     }
 
     function renderAll() {
       document.getElementById('month-title').innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth()+1} 月`;
-      populate(panels[map[0]], new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
-      populate(panels[map[1]], baseDate);
-      populate(panels[map[2]], new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
+      updatePanel(panels[map[0]], new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
+      updatePanel(panels[map[1]], baseDate);
+      updatePanel(panels[map[2]], new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
       setPos(0);
     }
 
@@ -81,23 +82,14 @@
       panels[map[2]].style.transform = `translate3d(${100+off}%,0,0)`;
     }
 
-    function openModal(k) { activeKey = k; document.getElementById('modal-date-title').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('editor-modal').classList.add('open'); }
-    function closeModal() { document.getElementById('editor-modal').classList.remove('open'); renderAll(); }
-    
-    function saveMonthlyNote(k, v) { localStorage.setItem(k, v); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:k, val:v})}); }
-    
-    document.getElementById('modal-textarea').oninput = (e) => { 
-      localStorage.setItem('note_'+activeKey, e.target.value); 
-      fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})});
-    };
-
+    function openModal(k) { activeKey = k; document.getElementById('modal-date').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('modal').classList.add('open'); }
+    function closeModal() { document.getElementById('modal').classList.remove('open'); renderAll(); }
     function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
+    document.getElementById('modal-textarea').oninput = (e) => { localStorage.setItem('note_'+activeKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})}); };
 
-    let startX = 0, isDragging = false;
-    viewport.ontouchstart = (e) => { startX = e.touches[0].clientX; isDragging = true; };
-    viewport.ontouchmove = (e) => { if(isDragging) setPos(((e.touches[0].clientX - startX)/viewport.clientWidth)*100); };
-    viewport.ontouchend = (e) => {
-      isDragging = false;
+    let startX = 0;
+    document.getElementById('viewport').ontouchstart = (e) => startX = e.touches[0].clientX;
+    document.getElementById('viewport').ontouchend = (e) => {
       const diff = e.changedTouches[0].clientX - startX;
       if (Math.abs(diff) < 50) setPos(0);
       else {
@@ -106,6 +98,8 @@
         renderAll();
       }
     };
+
+    panels.forEach(createLayout);
     renderAll();
   </script>
 </body>
