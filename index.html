@@ -32,7 +32,6 @@
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
     button:active { background-color: #eae8e1; }
     
-    /* 調整容器為並排顯示三個月份 */
     .viewport-container {
       flex: 1;
       width: 100%;
@@ -45,11 +44,11 @@
       width: 300%;
       height: 100%;
       will-change: transform;
-      transform: translateX(-33.333%); /* 預設顯示中間的本月 */
+      transform: translate3d(-33.3333%, 0, 0);
     }
 
     .month-view {
-      width: 33.333%; /* 每個月份佔 1/3 的 track 寬度，也就是一個螢幕寬 */
+      width: 33.3333%;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -97,7 +96,7 @@
   <script>
     const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
     
-    let baseDate = new Date(); // 當前顯示的中心月份
+    let baseDate = new Date();
     const monthTitle = document.getElementById('month-title');
     const syncStatus = document.getElementById('sync-status');
     const track = document.getElementById('track');
@@ -109,11 +108,7 @@
     }
 
     function setSyncState(isSyncing) {
-      if (isSyncing) {
-        syncStatus.classList.add('syncing');
-      } else {
-        syncStatus.classList.remove('syncing');
-      }
+      syncStatus.classList.toggle('syncing', isSyncing);
     }
 
     function syncToCloud(key, val) {
@@ -185,60 +180,18 @@
       return html;
     }
 
-    function attachListeners(container) {
-      container.querySelectorAll('.cell-editor').forEach(textarea => {
-        textarea.addEventListener('input', (e) => {
-          const key = `note_${e.target.getAttribute('data-key')}`;
-          const val = e.target.value;
-          localStorage.setItem(key, val);
-          clearTimeout(saveTimeout);
-          saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
-        });
-      });
-
-      container.querySelectorAll('.mark-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const target = e.currentTarget;
-          const rawKey = target.getAttribute('data-key');
-          const key = `mark_${rawKey}`;
-          target.classList.toggle('checked');
-          const val = target.classList.contains('checked') ? '1' : '0';
-          localStorage.setItem(key, val);
-          syncToCloud(key, val);
-        });
-      });
-      
-      container.querySelectorAll('.monthly-note-textarea').forEach(textarea => {
-         textarea.addEventListener('input', (e) => {
-            const key = e.target.getAttribute('data-monthkey');
-            const val = e.target.value;
-            localStorage.setItem(key, val);
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
-         });
-      });
-    }
-
     function renderViews() {
       const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
       const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
       
       monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-      const viewPrev = document.getElementById('view-prev');
-      const viewCurrent = document.getElementById('view-current');
-      const viewNext = document.getElementById('view-next');
-
-      viewPrev.innerHTML = generateMonthHTML(prevDate);
-      viewCurrent.innerHTML = generateMonthHTML(baseDate);
-      viewNext.innerHTML = generateMonthHTML(nextDate);
-
-      attachListeners(viewPrev);
-      attachListeners(viewCurrent);
-      attachListeners(viewNext);
+      document.getElementById('view-prev').innerHTML = generateMonthHTML(prevDate);
+      document.getElementById('view-current').innerHTML = generateMonthHTML(baseDate);
+      document.getElementById('view-next').innerHTML = generateMonthHTML(nextDate);
       
       track.style.transition = 'none';
-      track.style.transform = 'translateX(-33.333%)';
+      track.style.transform = 'translate3d(-33.3333%, 0, 0)';
     }
 
     function goToCurrentMonth() {
@@ -246,18 +199,43 @@
       renderViews();
     }
 
-    // 滑動邏輯
-    let startX = 0;
-    let startY = 0;
-    let currentX = 0;
-    let isDragging = false;
-    let isHorizontalScroll = null;
+    // 全局事件委派（大幅提升效能）
+    viewport.addEventListener('input', (e) => {
+      const target = e.target;
+      if (target.classList.contains('cell-editor')) {
+        const key = `note_${target.getAttribute('data-key')}`;
+        const val = target.value;
+        localStorage.setItem(key, val);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+      } else if (target.classList.contains('monthly-note-textarea')) {
+        const key = target.getAttribute('data-monthkey');
+        const val = target.value;
+        localStorage.setItem(key, val);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+      }
+    });
+
+    viewport.addEventListener('click', (e) => {
+      const target = e.target.closest('.mark-btn');
+      if (target) {
+        const rawKey = target.getAttribute('data-key');
+        const key = `mark_${rawKey}`;
+        target.classList.toggle('checked');
+        const val = target.classList.contains('checked') ? '1' : '0';
+        localStorage.setItem(key, val);
+        syncToCloud(key, val);
+      }
+    });
+
+    // 極速觸控滑動
+    let startX = 0, startY = 0, currentX = 0;
+    let isDragging = false, isHorizontalScroll = null;
     let trackWidth = 0;
 
     viewport.addEventListener('touchstart', (e) => {
-      // 忽略在 textarea 上的滑動，避免跟打字捲動衝突
-      if(e.target.tagName.toLowerCase() === 'textarea') return; 
-      
+      if (e.target.tagName.toLowerCase() === 'textarea') return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       currentX = startX;
@@ -274,48 +252,44 @@
       const diffY = e.touches[0].clientY - startY;
 
       if (isHorizontalScroll === null) {
-        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+        if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
           isHorizontalScroll = Math.abs(diffX) > Math.abs(diffY);
         }
       }
 
       if (isHorizontalScroll) {
-        if(e.cancelable) e.preventDefault(); // 防止橫向滑動時觸發瀏覽器上一頁/下一頁手勢
-        // 計算位移百分比 (相對於 track 的總寬度，總寬度是 viewport 的 3 倍)
-        const percentMoved = (diffX / (trackWidth * 3)) * 100;
-        track.style.transform = `translateX(calc(-33.333% + ${percentMoved}%))`;
+        if (e.cancelable) e.preventDefault();
+        const percent = -33.3333 + (diffX / (trackWidth * 3)) * 100;
+        track.style.transform = `translate3d(${percent}%, 0, 0)`;
       }
-    }, { passive: false }); // 需設為 false 才能 preventDefault
+    }, { passive: false });
 
-    viewport.addEventListener('touchend', (e) => {
+    viewport.addEventListener('touchend', () => {
       if (!isDragging || !isHorizontalScroll) {
-         isDragging = false;
-         return;
+        isDragging = false;
+        return;
       }
       isDragging = false;
       
       const diffX = currentX - startX;
-      const threshold = trackWidth * 0.25; // 滑動超過 25% 螢幕寬度則換月
+      const threshold = trackWidth * 0.2; // 20% 門檻觸發換月
 
-      track.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+      track.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
       
       if (diffX > threshold) {
-        // 滑向上個月 (向右拉)
-        track.style.transform = 'translateX(0%)';
+        track.style.transform = 'translate3d(0%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
           renderViews();
-        }, 300);
+        }, 220);
       } else if (diffX < -threshold) {
-        // 滑向下個月 (向左拉)
-        track.style.transform = 'translateX(-66.666%)';
+        track.style.transform = 'translate3d(-66.6666%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
           renderViews();
-        }, 300);
+        }, 220);
       } else {
-        // 彈回原位
-        track.style.transform = 'translateX(-33.333%)';
+        track.style.transform = 'translate3d(-33.3333%, 0, 0)';
       }
     }, { passive: true });
 
