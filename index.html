@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=13">
+  <link rel="manifest" href="manifest.json?v=14">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -39,22 +39,18 @@
       position: relative;
     }
     
-    .carousel-track {
-      display: flex;
-      width: 300%;
-      height: 100%;
-      will-change: transform;
-      transform: translate3d(-33.3333%, 0, 0);
-    }
-
     .month-view {
-      width: 33.3333%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
       height: 100%;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
+      will-change: transform, opacity;
       opacity: 0.38;
       transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     }
@@ -92,11 +88,9 @@
   </header>
   
   <div class="viewport-container" id="viewport">
-    <div class="carousel-track" id="track">
-      <div class="month-view" id="panel-0"></div>
-      <div class="month-view active-month" id="panel-1"></div>
-      <div class="month-view" id="panel-2"></div>
-    </div>
+    <div class="month-view" id="p0"></div>
+    <div class="month-view active-month" id="p1"></div>
+    <div class="month-view" id="p2"></div>
   </div>
 
   <script>
@@ -105,8 +99,16 @@
     let baseDate = new Date();
     const monthTitle = document.getElementById('month-title');
     const syncStatus = document.getElementById('sync-status');
-    const track = document.getElementById('track');
     const viewport = document.getElementById('viewport');
+    
+    const panels = [
+      document.getElementById('p0'),
+      document.getElementById('p1'),
+      document.getElementById('p2')
+    ];
+    
+    // 面板指針映射：[左側索引, 中間索引, 右側索引]
+    let map = [0, 1, 2]; 
     let saveTimeout = null;
     let isTransitioning = false;
 
@@ -211,21 +213,31 @@
       noteBox.value = localStorage.getItem(monthKey) || '';
     }
 
+    function setPanelPositions(offsetPercent = 0, transition = 'none') {
+      const [l, c, r] = map;
+      panels[l].style.transition = transition;
+      panels[c].style.transition = transition;
+      panels[r].style.transition = transition;
+
+      panels[l].style.transform = `translate3d(${-100 + offsetPercent}%, 0, 0)`;
+      panels[c].style.transform = `translate3d(${offsetPercent}%, 0, 0)`;
+      panels[r].style.transform = `translate3d(${100 + offsetPercent}%, 0, 0)`;
+    }
+
     function renderAll() {
       monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
       const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
       const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
 
-      populateMonthData(track.children[0], prevDate);
-      populateMonthData(track.children[1], baseDate);
-      populateMonthData(track.children[2], nextDate);
+      populateMonthData(panels[map[0]], prevDate);
+      populateMonthData(panels[map[1]], baseDate);
+      populateMonthData(panels[map[2]], nextDate);
 
-      track.children[0].className = 'month-view';
-      track.children[1].className = 'month-view active-month';
-      track.children[2].className = 'month-view';
+      panels[map[0]].className = 'month-view';
+      panels[map[1]].className = 'month-view active-month';
+      panels[map[2]].className = 'month-view';
 
-      track.style.transition = 'none';
-      track.style.transform = 'translate3d(-33.3333%, 0, 0)';
+      setPanelPositions(0, 'none');
     }
 
     function goToCurrentMonth() {
@@ -263,7 +275,7 @@
       }
     });
 
-    // 觸控手勢監聽（無縫循環節點切換）
+    // 純坐標無感手勢
     let startX = 0, startY = 0, currentX = 0;
     let isDragging = false, isHorizontal = null;
     let trackWidth = 0;
@@ -276,7 +288,7 @@
       isDragging = true;
       isHorizontal = null;
       trackWidth = viewport.clientWidth;
-      track.style.transition = 'none';
+      setPanelPositions(0, 'none');
     }, { passive: true });
 
     viewport.addEventListener('touchmove', (e) => {
@@ -293,8 +305,8 @@
 
       if (isHorizontal) {
         if (e.cancelable) e.preventDefault();
-        const percent = -33.3333 + (diffX / (trackWidth * 3)) * 100;
-        track.style.transform = `translate3d(${percent}%, 0, 0)`;
+        const percent = (diffX / trackWidth) * 100;
+        setPanelPositions(percent, 'none');
       }
     }, { passive: false });
 
@@ -307,65 +319,60 @@
       
       const diffX = currentX - startX;
       const threshold = trackWidth * 0.10;
+      const animCurve = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
 
-      track.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
-      
       if (diffX > threshold) {
-        // 滑向上個月（向右滑）
+        // 向右滑（上個月）
         isTransitioning = true;
-        track.children[0].className = 'month-view active-month';
-        track.children[1].className = 'month-view';
-        track.style.transform = 'translate3d(0%, 0, 0)';
+        panels[map[0]].className = 'month-view active-month';
+        panels[map[1]].className = 'month-view';
+        setPanelPositions(100, animCurve);
 
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
           monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-          // 將最後一個節點移到最前面，中間視圖完全不重新渲染
-          const lastChild = track.lastElementChild;
-          track.insertBefore(lastChild, track.firstElementChild);
+          // 指針輪替：原來的右邊面板變成新的左邊面板
+          const oldRight = map[2];
+          map = [oldRight, map[0], map[1]];
 
-          track.style.transition = 'none';
-          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
-
-          // 僅在背景補齊新的上個月資料
+          // 只在螢幕外更新這個被移到最左邊的面板
           const newPrevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
-          populateMonthData(lastChild, newPrevDate);
-          lastChild.className = 'month-view';
+          populateMonthData(panels[map[0]], newPrevDate);
+          panels[map[0]].className = 'month-view';
 
+          setPanelPositions(0, 'none');
           isTransitioning = false;
         }, 250);
       } else if (diffX < -threshold) {
-        // 滑向下個月（向左滑）
+        // 向左滑（下個月）
         isTransitioning = true;
-        track.children[2].className = 'month-view active-month';
-        track.children[1].className = 'month-view';
-        track.style.transform = 'translate3d(-66.6666%, 0, 0)';
+        panels[map[2]].className = 'month-view active-month';
+        panels[map[1]].className = 'month-view';
+        setPanelPositions(-100, animCurve);
 
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
           monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-          // 將第一個節點移到最後面，中間視圖完全不重新渲染
-          const firstChild = track.firstElementChild;
-          track.appendChild(firstChild);
+          // 指針輪替：原來的左邊面板變成新的右邊面板
+          const oldLeft = map[0];
+          map = [map[1], map[2], oldLeft];
 
-          track.style.transition = 'none';
-          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
-
-          // 僅在背景補齊新的下個月資料
+          // 只在螢幕外更新這個被移到最右邊的面板
           const newNextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
-          populateMonthData(firstChild, newNextDate);
-          firstChild.className = 'month-view';
+          populateMonthData(panels[map[2]], newNextDate);
+          panels[map[2]].className = 'month-view';
 
+          setPanelPositions(0, 'none');
           isTransitioning = false;
         }, 250);
       } else {
-        track.style.transform = 'translate3d(-33.3333%, 0, 0)';
+        setPanelPositions(0, animCurve);
       }
     });
 
-    ['panel-0', 'panel-1', 'panel-2'].forEach(id => initMonthViewSkeleton(document.getElementById(id)));
+    panels.forEach(initMonthViewSkeleton);
     renderAll();
     fetchCloudData();
   </script>
