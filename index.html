@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=5">
+  <link rel="manifest" href="manifest.json?v=6">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -136,53 +136,79 @@
         .then(res => res.json())
         .then(data => {
           Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
-          renderViews();
+          renderAllMonths();
           setSyncState(false);
         })
         .catch(() => setSyncState(false));
     }
 
-    function generateMonthHTML(dateObj) {
+    // 初始化建立固定 42 格 (7x6) 的固定 DOM 骨架
+    function initMonthViewSkeleton(container) {
+      let html = `<div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div><div class="month-grid">`;
+      for (let i = 0; i < 42; i++) {
+        html += `
+          <div class="day-cell" data-idx="${i}">
+            <div class="day-header">
+              <span class="date-num"></span>
+              <button class="mark-btn" data-key=""></button>
+            </div>
+            <textarea class="cell-editor" placeholder="" data-key=""></textarea>
+          </div>`;
+      }
+      html += `</div>
+        <div class="monthly-note-box">
+          <textarea class="monthly-note-textarea" placeholder="其他" data-monthkey=""></textarea>
+        </div>`;
+      container.innerHTML = html;
+    }
+
+    // 只更新文字與屬性，不重建 DOM
+    function populateMonthData(container, dateObj) {
       const year = dateObj.getFullYear();
       const month = dateObj.getMonth() + 1;
-      
       const firstDayIndex = new Date(year, month - 1, 1).getDay();
       const daysInMonth = new Date(year, month, 0).getDate();
       const today = new Date();
       const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
 
-      let html = `<div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div><div class="month-grid">`;
-      
-      for (let i = 0; i < firstDayIndex; i++) {
-        html += `<div class="day-cell empty-cell"></div>`;
-      }
-      
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateKey = formatDateKey(year, month, day);
-        const isToday = isCurrentMonth && today.getDate() === day;
-        const savedText = localStorage.getItem(`note_${dateKey}`) || '';
-        const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
+      const cells = container.querySelectorAll('.day-cell');
+      for (let i = 0; i < 42; i++) {
+        const cell = cells[i];
+        const dateNum = cell.querySelector('.date-num');
+        const markBtn = cell.querySelector('.mark-btn');
+        const textarea = cell.querySelector('.cell-editor');
 
-        html += `
-          <div class="day-cell ${isToday ? 'today' : ''}">
-            <div class="day-header">
-              <span class="date-num">${day}</span>
-              <button class="mark-btn ${isMarked ? 'checked' : ''}" data-key="${dateKey}"></button>
-            </div>
-            <textarea class="cell-editor" placeholder="" data-key="${dateKey}">${savedText}</textarea>
-          </div>`;
+        if (i < firstDayIndex || i >= firstDayIndex + daysInMonth) {
+          cell.className = 'day-cell empty-cell';
+          dateNum.innerText = '';
+          markBtn.style.display = 'none';
+          textarea.style.display = 'none';
+          textarea.value = '';
+          textarea.setAttribute('data-key', '');
+          markBtn.setAttribute('data-key', '');
+        } else {
+          const day = i - firstDayIndex + 1;
+          const dateKey = formatDateKey(year, month, day);
+          const isToday = isCurrentMonth && today.getDate() === day;
+          const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
+
+          cell.className = `day-cell ${isToday ? 'today' : ''}`;
+          dateNum.innerText = day;
+          markBtn.style.display = 'flex';
+          textarea.style.display = 'block';
+          
+          markBtn.className = `mark-btn ${isMarked ? 'checked' : ''}`;
+          markBtn.setAttribute('data-key', dateKey);
+          
+          textarea.setAttribute('data-key', dateKey);
+          textarea.value = localStorage.getItem(`note_${dateKey}`) || '';
+        }
       }
-      html += `</div>`;
-      
+
       const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
-      const savedMonthlyNote = localStorage.getItem(monthKey) || '';
-      
-      html += `
-        <div class="monthly-note-box">
-          <textarea class="monthly-note-textarea" placeholder="其他" data-monthkey="${monthKey}">${savedMonthlyNote}</textarea>
-        </div>`;
-      
-      return html;
+      const noteBox = container.querySelector('.monthly-note-textarea');
+      noteBox.setAttribute('data-monthkey', monthKey);
+      noteBox.value = localStorage.getItem(monthKey) || '';
     }
 
     function setOpacities(prevOp, curOp, nextOp) {
@@ -191,25 +217,24 @@
       viewNext.style.opacity = nextOp;
     }
 
-    function renderViews() {
+    function renderAllMonths() {
       const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
       const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
       
       monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
 
-      viewPrev.innerHTML = generateMonthHTML(prevDate);
-      viewCurrent.innerHTML = generateMonthHTML(baseDate);
-      viewNext.innerHTML = generateMonthHTML(nextDate);
+      populateMonthData(viewPrev, prevDate);
+      populateMonthData(viewCurrent, baseDate);
+      populateMonthData(viewNext, nextDate);
       
       setOpacities('0.35', '1', '0.35');
-
       track.style.transition = 'none';
       track.style.transform = 'translate3d(-33.3333%, 0, 0)';
     }
 
     function goToCurrentMonth() {
       baseDate = new Date();
-      renderViews();
+      renderAllMonths();
     }
 
     viewport.addEventListener('input', (e) => {
@@ -233,6 +258,7 @@
       const target = e.target.closest('.mark-btn');
       if (target) {
         const rawKey = target.getAttribute('data-key');
+        if (!rawKey) return;
         const key = `mark_${rawKey}`;
         target.classList.toggle('checked');
         const val = target.classList.contains('checked') ? '1' : '0';
@@ -241,7 +267,7 @@
       }
     });
 
-    // 極速平滑觸控監聽
+    // 觸控拖曳
     let startX = 0, startY = 0, currentX = 0;
     let isDragging = false, isHorizontal = null;
     let trackWidth = 0;
@@ -277,7 +303,6 @@
         const percent = -33.3333 + (diffX / (trackWidth * 3)) * 100;
         track.style.transform = `translate3d(${percent}%, 0, 0)`;
 
-        // 即時計算動態透明度過渡
         const progress = Math.min(Math.abs(diffX) / trackWidth, 1);
         const curOp = 1 - progress * 0.65;
         const targetOp = 0.35 + progress * 0.65;
@@ -300,10 +325,10 @@
       const diffX = currentX - startX;
       const threshold = trackWidth * 0.18;
 
-      track.style.transition = 'transform 0.26s cubic-bezier(0.16, 1, 0.3, 1)';
-      viewPrev.style.transition = 'opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1)';
-      viewCurrent.style.transition = 'opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1)';
-      viewNext.style.transition = 'opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1)';
+      track.style.transition = 'transform 0.24s cubic-bezier(0.16, 1, 0.3, 1)';
+      viewPrev.style.transition = 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)';
+      viewCurrent.style.transition = 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)';
+      viewNext.style.transition = 'opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1)';
       
       if (diffX > threshold) {
         isTransitioning = true;
@@ -311,51 +336,30 @@
         track.style.transform = 'translate3d(0%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() - 1);
-          // 靜默重置 DOM 與位置
-          viewCurrent.innerHTML = viewPrev.innerHTML;
-          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
-          track.style.transition = 'none';
-          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
-          setOpacities('0.35', '1', '0.35');
-          
-          // 非同步補齊兩側月份
-          setTimeout(() => {
-            const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
-            const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
-            viewPrev.innerHTML = generateMonthHTML(prevDate);
-            viewNext.innerHTML = generateMonthHTML(nextDate);
-            isTransitioning = false;
-          }, 20);
-        }, 260);
+          renderAllMonths();
+          isTransitioning = false;
+        }, 240);
       } else if (diffX < -threshold) {
         isTransitioning = true;
         setOpacities('0.35', '0.35', '1');
         track.style.transform = 'translate3d(-66.6666%, 0, 0)';
         setTimeout(() => {
           baseDate.setMonth(baseDate.getMonth() + 1);
-          // 靜默重置 DOM 與位置
-          viewCurrent.innerHTML = viewNext.innerHTML;
-          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
-          track.style.transition = 'none';
-          track.style.transform = 'translate3d(-33.3333%, 0, 0)';
-          setOpacities('0.35', '1', '0.35');
-          
-          // 非同步補齊兩側月份
-          setTimeout(() => {
-            const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
-            const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
-            viewPrev.innerHTML = generateMonthHTML(prevDate);
-            viewNext.innerHTML = generateMonthHTML(nextDate);
-            isTransitioning = false;
-          }, 20);
-        }, 260);
+          renderAllMonths();
+          isTransitioning = false;
+        }, 240);
       } else {
         setOpacities('0.35', '1', '0.35');
         track.style.transform = 'translate3d(-33.3333%, 0, 0)';
       }
     }, { passive: true });
 
-    renderViews();
+    // 初始化骨架與資料
+    initMonthViewSkeleton(viewPrev);
+    initMonthViewSkeleton(viewCurrent);
+    initMonthViewSkeleton(viewNext);
+
+    renderAllMonths();
     fetchCloudData();
   </script>
 </body>
