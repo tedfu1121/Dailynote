@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=7">
+  <link rel="manifest" href="manifest.json?v=8">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,10 +24,7 @@
     
     .viewport-container { flex: 1; width: 100%; overflow: hidden; position: relative; }
     .carousel-track { display: flex; width: 300%; height: 100%; will-change: transform; transform: translate3d(-33.3333%, 0, 0); }
-    .month-view { width: 33.3333%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
-    
-    /* 移除 opacity transition，改用 CSS class 處理淡入淡出更穩定 */
-    .month-view { transition: opacity 0.2s ease-out; opacity: 0.35; }
+    .month-view { width: 33.3333%; height: 100%; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; transition: opacity 0.2s ease-out; opacity: 0.35; }
     .month-view.active-month { opacity: 1; }
 
     .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
@@ -63,7 +60,7 @@
     const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
     let baseDate = new Date();
     const track = document.getElementById('track'), viewport = document.getElementById('viewport');
-    let isTransitioning = false;
+    let saveTimeout = null, isTransitioning = false;
 
     function populateMonthData(container, dateObj) {
       const year = dateObj.getFullYear(), month = dateObj.getMonth() + 1;
@@ -110,11 +107,68 @@
       track.style.transform = 'translate3d(-33.3333%, 0, 0)';
     }
 
-    // 觸控與事件委派與之前邏輯相同，省略重複部分以保持乾淨
-    // (在這邊加上 requestAnimationFrame 優化)
-    function goToCurrentMonth() { baseDate = new Date(); requestAnimationFrame(renderAll); }
-    
-    // 初始化
+    viewport.addEventListener('input', (e) => {
+      const target = e.target;
+      if (target.classList.contains('cell-editor') || target.classList.contains('monthly-note-textarea')) {
+        const key = target.getAttribute('data-key') ? ('note_' + target.getAttribute('data-key')) : target.getAttribute('data-monthkey');
+        const val = target.value;
+        localStorage.setItem(key, val);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          fetch(CLOUD_API_URL, {method: "POST", mode: "no-cors", body: JSON.stringify({key, val})});
+          document.getElementById('sync-status').classList.remove('syncing');
+        }, 800);
+        document.getElementById('sync-status').classList.add('syncing');
+      }
+    });
+
+    viewport.addEventListener('click', (e) => {
+      const target = e.target.closest('.mark-btn');
+      if (target) {
+        const key = 'mark_' + target.getAttribute('data-key');
+        target.classList.toggle('checked');
+        const val = target.classList.contains('checked') ? '1' : '0';
+        localStorage.setItem(key, val);
+        fetch(CLOUD_API_URL, {method: "POST", mode: "no-cors", body: JSON.stringify({key, val})});
+      }
+    });
+
+    let startX = 0, currentX = 0, isDragging = false, isHorizontal = null;
+    viewport.addEventListener('touchstart', (e) => {
+      if (isTransitioning) return;
+      startX = e.touches[0].clientX;
+      isDragging = true; isHorizontal = null;
+      track.style.transition = 'none';
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      const diffX = e.touches[0].clientX - startX;
+      if (isHorizontal === null) isHorizontal = Math.abs(diffX) > 10;
+      if (isHorizontal) {
+        if(e.cancelable) e.preventDefault();
+        track.style.transform = `translate3d(${-33.3333 + (diffX / viewport.clientWidth) * 100}%, 0, 0)`;
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+      if (!isDragging || !isHorizontal) return;
+      isDragging = false;
+      const diffX = e.changedTouches[0].clientX - startX;
+      track.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+      if (Math.abs(diffX) > viewport.clientWidth * 0.2) {
+        isTransitioning = true;
+        track.style.transform = diffX > 0 ? 'translate3d(0%, 0, 0)' : 'translate3d(-66.6666%, 0, 0)';
+        setTimeout(() => {
+          baseDate.setMonth(baseDate.getMonth() + (diffX > 0 ? -1 : 1));
+          renderAll();
+          isTransitioning = false;
+        }, 300);
+      } else {
+        track.style.transform = 'translate3d(-33.3333%, 0, 0)';
+      }
+    });
+
     ['view-prev','view-current','view-next'].forEach(id => initSkeleton(document.getElementById(id)));
     renderAll();
   </script>
