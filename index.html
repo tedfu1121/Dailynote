@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
   
-  <link rel="manifest" href="manifest.json?v=10">
+  <link rel="manifest" href="manifest.json?v=11">
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -267,13 +267,13 @@
       }
     });
 
-    // 觸控手勢監聽（自然阻尼與平滑彈性）
+    // 觸控手勢監聽（全區域支援 + 高靈敏度）
     let startX = 0, startY = 0, currentX = 0;
     let isDragging = false, isHorizontal = null;
     let trackWidth = 0;
 
     viewport.addEventListener('touchstart', (e) => {
-      if (isTransitioning || e.target.tagName === 'TEXTAREA') return;
+      if (isTransitioning) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       currentX = startX;
@@ -290,7 +290,7 @@
       const diffY = e.touches[0].clientY - startY;
 
       if (isHorizontal === null) {
-        if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+        if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
           isHorizontal = Math.abs(diffX) > Math.abs(diffY);
         }
       }
@@ -310,9 +310,9 @@
       isDragging = false;
       
       const diffX = currentX - startX;
-      const threshold = trackWidth * 0.14; // 14% 自然門檻
+      const threshold = trackWidth * 0.10; // 10% 靈敏門檻
 
-      track.style.transition = 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)';
+      track.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
       
       if (diffX > threshold) {
         isTransitioning = true;
@@ -323,7 +323,7 @@
           baseDate.setMonth(baseDate.getMonth() - 1);
           renderAllMonths();
           isTransitioning = false;
-        }, 280);
+        }, 250);
       } else if (diffX < -threshold) {
         isTransitioning = true;
         viewNext.className = 'month-view active-month';
@@ -333,13 +333,12 @@
           baseDate.setMonth(baseDate.getMonth() + 1);
           renderAllMonths();
           isTransitioning = false;
-        }, 280);
+        }, 250);
       } else {
         track.style.transform = 'translate3d(-33.3333%, 0, 0)';
       }
     }, { passive: true });
 
-    // 初始化骨架與資料
     initMonthViewSkeleton(viewPrev);
     initMonthViewSkeleton(viewCurrent);
     initMonthViewSkeleton(viewNext);
