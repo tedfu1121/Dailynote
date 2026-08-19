@@ -30,6 +30,7 @@
     .sync-indicator.syncing { background-color: #ff9800; }
     
     button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
+    .arrow-btn { font-weight: 700; padding: 5px 10px; }
     button:active { background-color: #eae8e1; }
     
     .calendar-container { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; width: 100%; }
@@ -57,9 +58,9 @@
   <header>
     <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span></div>
     <div style="display:flex; gap:6px;">
-      <button onclick="changeMonth(-1)"><<</button>
+      <button class="arrow-btn" onclick="changeMonth(-1)">❮</button>
       <button onclick="goToCurrentMonth()">今天</button>
-      <button onclick="changeMonth(1)">>></button>
+      <button class="arrow-btn" onclick="changeMonth(1)">❯</button>
     </div>
   </header>
   
