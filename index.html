@@ -2,122 +2,492 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.1, maximum-scale=3.0, user-scalable=yes">
   <title>Daily Note</title>
+  
+  <link rel="manifest" href="manifest.json?v=20">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/calendar--v1.png">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Daily Note">
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: sans-serif; background-color: #f7f6f2; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e0d8; background: #f7f6f2; flex-shrink: 0; }
+    body { 
+      font-family: sans-serif; 
+      background-color: #f7f6f2; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      overflow: hidden; 
+      padding-top: 10px;
+    }
     
-    .viewport { flex: 1; position: relative; overflow: hidden; }
-    .panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; will-change: transform; opacity: 0.38; transition: opacity 0.2s; }
-    .panel.active { opacity: 1; }
+    header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; background-color: #f7f6f2; border-bottom: 1px solid #e2e0d8; flex-shrink: 0; z-index: 10; }
+    .nav-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .sync-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #4caf50; display: inline-block; transition: background-color 0.3s; }
+    .sync-indicator.syncing { background-color: #ff9800; }
     
-    .grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background: #e5e3dc; gap: 1px; flex-grow: 1; }
-    .cell { background: #fff; min-height: 80px; padding: 4px; display: flex; flex-direction: column; cursor: pointer; }
-    .cell.empty { background: #f7f6f2; }
-    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-    .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background: #fff; }
-    .mark-btn.checked { background: #a33b3b; border-color: #a33b3b; }
-    .preview { font-size: 8px; color: #666; line-height: 1.2; overflow: hidden; flex: 1; }
+    button { background: #ffffff; border: 1px solid #d0cecd; padding: 5px 12px; border-radius: 4px; font-size: 13.5px; cursor: pointer; color: #333; }
+    button:active { background-color: #eae8e1; }
     
-    .note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
-    .note-input { width: 100%; height: 50px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; resize: none; }
+    .viewport-container {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
     
-    #modal { position: fixed; bottom: -60%; left: 0; width: 100%; height: 60vh; background: #fff; z-index: 100; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); transition: bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1); display: flex; flex-direction: column; padding: 20px; }
-    #modal.open { bottom: 0; }
-    #modal-textarea { flex: 1; border: none; font-size: 15px; outline: none; width: 100%; resize: none; margin-bottom: 10px; }
+    .month-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      will-change: transform, opacity;
+      opacity: 0.38;
+      transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .month-view.active-month {
+      opacity: 1;
+    }
+    
+    .weekdays-header { display: grid; grid-template-columns: repeat(7, 1fr); background: #f0eee8; border-bottom: 1px solid #e2e0d8; font-size: 9px; text-align: center; color: #666; padding: 6px 0; }
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; background-color: #e5e3dc; gap: 1px; }
+    .day-cell { background-color: #ffffff; min-height: 82.5px; display: flex; flex-direction: column; padding: 1px 2px 4px 1px; cursor: pointer; }
+    .day-cell.empty-cell { background-color: #f7f6f2; border: none; cursor: default; }
+    
+    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; line-height: 1; }
+    .date-num { font-size: 10px; font-weight: 800; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+    .day-cell.today .date-num { background-color: #444; color: #fff; }
+    
+    .mark-btn { width: 12px; height: 12px; border: 1px solid #ccc; border-radius: 50%; background-color: #fff; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .mark-btn.checked { background-color: #a33b3b; border-color: #a33b3b; }
+    .mark-btn.checked::after { content: ''; width: 2px; height: 4px; border: solid white; border-width: 0 1.2px 1.2px 0; transform: rotate(45deg); margin-bottom: 1px; }
+    
+    .cell-preview { 
+      flex: 1; 
+      width: 100%; 
+      font-size: 8.6px; 
+      line-height: 1.35; 
+      color: #222; 
+      background: transparent; 
+      padding: 0; 
+      overflow: hidden; 
+      display: -webkit-box; 
+      -webkit-line-clamp: 4; 
+      -webkit-box-orient: vertical; 
+      word-break: break-all;
+      pointer-events: none;
+    }
+    
+    .monthly-note-box { padding: 10px; background: #e5e3dc; border-top: 1px solid #dcdad4; }
+    .monthly-note-textarea { width: 100%; height: 80px; border: 1px solid #d0cecd; border-radius: 4px; padding: 8px; font-size: 11px; color: #222; background: #fff; resize: none; outline: none; font-family: inherit; }
+
+    /* 沉浸式編輯彈窗 */
+    #editor-modal {
+      position: fixed;
+      bottom: -60vh;
+      left: 0;
+      width: 100%;
+      height: 55vh;
+      background: #ffffff;
+      z-index: 100;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+      transition: bottom 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 18px;
+    }
+    #editor-modal.open {
+      bottom: 0;
+    }
+    .modal-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .modal-date-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #333;
+    }
+    #modal-textarea {
+      flex: 1;
+      width: 100%;
+      border: 1px solid #e2e0d8;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #222;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+      background: #faf9f6;
+    }
+    .modal-close-btn {
+      background: #444;
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <header>
-    <div id="month-title" style="font-weight:700;">--</div>
-    <button onclick="baseDate=new Date(); renderAll();">今天</button>
+    <div class="nav-title"><span id="month-title">-- 年 -- 月</span><span class="sync-indicator" id="sync-status" title="雲端同步狀態"></span></div>
+    <div style="display:flex; gap:6px;">
+      <button onclick="goToCurrentMonth()">今天</button>
+    </div>
   </header>
-  <div class="viewport" id="viewport">
-    <div class="panel" id="p0"></div><div class="panel active" id="p1"></div><div class="panel" id="p2"></div>
+  
+  <div class="viewport-container" id="viewport">
+    <div class="month-view" id="p0"></div>
+    <div class="month-view active-month" id="p1"></div>
+    <div class="month-view" id="p2"></div>
   </div>
-  <div id="modal">
-    <div style="font-weight:bold; margin-bottom:10px;" id="modal-date-title"></div>
-    <textarea id="modal-textarea"></textarea>
-    <button onclick="closeModal()" style="padding:12px; background:#444; color:#fff; border-radius:8px;">儲存並關閉</button>
+
+  <div id="editor-modal">
+    <div class="modal-bar">
+      <span class="modal-date-title" id="modal-date-title"></span>
+      <button class="modal-close-btn" onclick="closeEditor()">完成</button>
+    </div>
+    <textarea id="modal-textarea" placeholder="輸入今日記事..."></textarea>
   </div>
 
   <script>
-    const CLOUD = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec";
-    let baseDate = new Date(), activeKey = null;
-    const panels = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2')];
-    let map = [0, 1, 2];
+    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbzvq92u9Hswly1GTVhGA4v7j_O9XJ0FNnOGYWKdjxvl0Qu0TXPAuK9aNQgsCwbzWAm_9Q/exec"; 
+    
+    let baseDate = new Date();
+    const monthTitle = document.getElementById('month-title');
+    const syncStatus = document.getElementById('sync-status');
+    const viewport = document.getElementById('viewport');
+    const modal = document.getElementById('editor-modal');
+    const modalTextarea = document.getElementById('modal-textarea');
+    const modalDateTitle = document.getElementById('modal-date-title');
+    
+    let activeEditKey = null;
 
-    function createLayout(p) {
-      let html = `<div class="grid">` + Array(42).fill(0).map((_,i) => `<div class="cell" data-idx="${i}"></div>`).join('') + `</div>`;
-      html += `<div class="note-box"><textarea class="note-input" placeholder="其他事項"></textarea></div>`;
-      p.innerHTML = html;
+    const panels = [
+      document.getElementById('p0'),
+      document.getElementById('p1'),
+      document.getElementById('p2')
+    ];
+    
+    let map = [0, 1, 2]; 
+    let saveTimeout = null;
+    let isTransitioning = false;
+
+    function formatDateKey(year, month, day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
 
-    function populate(p, date) {
-      const y = date.getFullYear(), m = date.getMonth()+1, first = new Date(y, m-1, 1).getDay(), days = new Date(y, m, 0).getDate();
-      const cells = p.querySelectorAll('.cell');
-      const noteInput = p.querySelector('.note-input');
-      const mKey = `note_monthly_${y}_${String(m).padStart(2,'0')}`;
-      noteInput.value = localStorage.getItem(mKey) || '';
-      noteInput.oninput = (e) => { localStorage.setItem(mKey, e.target.value); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:mKey, val:e.target.value})}); };
-      cells.forEach((cell, i) => {
-        const d = i - first + 1;
-        if(i < first || i >= first+days) { cell.innerHTML = ''; cell.className = 'cell empty'; }
-        else {
-          const key = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-          cell.className = 'cell';
-          cell.onclick = () => openModal(key);
-          cell.innerHTML = `<div class="day-header"><span style="font-weight:800;">${d}</span><button class="mark-btn ${localStorage.getItem('mark_'+key)==='1'?'checked':''}" onclick="event.stopPropagation(); toggleMark('${key}')"></button></div><div class="preview">${localStorage.getItem('note_'+key)||''}</div>`;
+    function setSyncState(isSyncing) {
+      syncStatus.classList.toggle('syncing', isSyncing);
+    }
+
+    function syncToCloud(key, val) {
+      if (!CLOUD_API_URL) return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: key, val: val })
+      }).then(() => {
+        setTimeout(() => setSyncState(false), 400);
+      }).catch(() => setSyncState(false));
+    }
+
+    function fetchCloudData() {
+      if (!CLOUD_API_URL) return;
+      setSyncState(true);
+      fetch(CLOUD_API_URL)
+        .then(res => res.json())
+        .then(data => {
+          Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
+          renderAll();
+          setSyncState(false);
+        })
+        .catch(() => setSyncState(false));
+    }
+
+    function initMonthViewSkeleton(container) {
+      let html = `<div class="weekdays-header"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div><div class="month-grid">`;
+      for (let i = 0; i < 42; i++) {
+        html += `
+          <div class="day-cell" data-idx="${i}">
+            <div class="day-header">
+              <span class="date-num"></span>
+              <button class="mark-btn" data-key=""></button>
+            </div>
+            <div class="cell-preview" data-key=""></div>
+          </div>`;
+      }
+      html += `</div>
+        <div class="monthly-note-box">
+          <textarea class="monthly-note-textarea" placeholder="其他" data-monthkey=""></textarea>
+        </div>`;
+      container.innerHTML = html;
+    }
+
+    function populateMonthData(container, dateObj) {
+      const year = dateObj.getFullYear();
+      const month = dateObj.getMonth() + 1;
+      const firstDayIndex = new Date(year, month - 1, 1).getDay();
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const today = new Date();
+      const isCurrentMonth = today.getFullYear() === year && (today.getMonth() + 1) === month;
+
+      const cells = container.querySelectorAll('.day-cell');
+      for (let i = 0; i < 42; i++) {
+        const cell = cells[i];
+        const dateNum = cell.querySelector('.date-num');
+        const markBtn = cell.querySelector('.mark-btn');
+        const preview = cell.querySelector('.cell-preview');
+
+        if (i < firstDayIndex || i >= firstDayIndex + daysInMonth) {
+          cell.className = 'day-cell empty-cell';
+          dateNum.innerText = '';
+          markBtn.style.display = 'none';
+          preview.innerText = '';
+          preview.setAttribute('data-key', '');
+          markBtn.setAttribute('data-key', '');
+          cell.removeAttribute('data-datekey');
+        } else {
+          const day = i - firstDayIndex + 1;
+          const dateKey = formatDateKey(year, month, day);
+          const isToday = isCurrentMonth && today.getDate() === day;
+          const isMarked = localStorage.getItem(`mark_${dateKey}`) === '1';
+
+          cell.className = `day-cell ${isToday ? 'today' : ''}`;
+          cell.setAttribute('data-datekey', dateKey);
+          dateNum.innerText = day;
+          markBtn.style.display = 'flex';
+          
+          markBtn.className = `mark-btn ${isMarked ? 'checked' : ''}`;
+          markBtn.setAttribute('data-key', dateKey);
+          
+          preview.setAttribute('data-key', dateKey);
+          preview.innerText = localStorage.getItem(`note_${dateKey}`) || '';
         }
-      });
+      }
+
+      const monthKey = `note_monthly_${year}_${String(month).padStart(2, '0')}`;
+      const noteBox = container.querySelector('.monthly-note-textarea');
+      noteBox.setAttribute('data-monthkey', monthKey);
+      noteBox.value = localStorage.getItem(monthKey) || '';
+    }
+
+    function setPanelPositions(offsetPercent = 0, transition = 'none') {
+      const [l, c, r] = map;
+      panels[l].style.transition = transition;
+      panels[c].style.transition = transition;
+      panels[r].style.transition = transition;
+
+      panels[l].style.transform = `translate3d(${-100 + offsetPercent}%, 0, 0)`;
+      panels[c].style.transform = `translate3d(${offsetPercent}%, 0, 0)`;
+      panels[r].style.transform = `translate3d(${100 + offsetPercent}%, 0, 0)`;
     }
 
     function renderAll() {
-      document.getElementById('month-title').innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth()+1} 月`;
-      populate(panels[map[0]], new Date(baseDate.getFullYear(), baseDate.getMonth()-1, 1));
-      populate(panels[map[1]], baseDate);
-      populate(panels[map[2]], new Date(baseDate.getFullYear(), baseDate.getMonth()+1, 1));
-      setPos(0);
+      monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
+      const prevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+      const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+
+      populateMonthData(panels[map[0]], prevDate);
+      populateMonthData(panels[map[1]], baseDate);
+      populateMonthData(panels[map[2]], nextDate);
+
+      panels[map[0]].className = 'month-view';
+      panels[map[1]].className = 'month-view active-month';
+      panels[map[2]].className = 'month-view';
+
+      setPanelPositions(0, 'none');
     }
 
-    function setPos(off, trans = 'none') {
-      panels[map[0]].style.transition = trans; panels[map[1]].style.transition = trans; panels[map[2]].style.transition = trans;
-      panels[map[0]].style.transform = `translate3d(${-100+off}%,0,0)`;
-      panels[map[1]].style.transform = `translate3d(${off}%,0,0)`;
-      panels[map[2]].style.transform = `translate3d(${100+off}%,0,0)`;
+    function goToCurrentMonth() {
+      baseDate = new Date();
+      renderAll();
     }
 
-    function openModal(k) { activeKey = k; document.getElementById('modal-date-title').innerText = k; document.getElementById('modal-textarea').value = localStorage.getItem('note_'+k) || ''; document.getElementById('modal').classList.add('open'); }
-    function closeModal() { document.getElementById('modal').classList.remove('open'); renderAll(); }
+    function openEditor(key) {
+      activeEditKey = key;
+      modalDateTitle.innerText = key;
+      modalTextarea.value = localStorage.getItem(`note_${key}`) || '';
+      modal.classList.add('open');
+      modalTextarea.focus();
+    }
 
-    document.getElementById('modal-textarea').oninput = (e) => { 
-      localStorage.setItem('note_'+activeKey, e.target.value); 
-      fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'note_'+activeKey, val:e.target.value})});
-    };
+    function closeEditor() {
+      modal.classList.remove('open');
+      modalTextarea.blur();
+      if (activeEditKey) {
+        const val = modalTextarea.value;
+        const storageKey = `note_${activeEditKey}`;
+        localStorage.setItem(storageKey, val);
+        syncToCloud(storageKey, val);
 
-    function toggleMark(k) { const c = localStorage.getItem('mark_'+k)==='1'; localStorage.setItem('mark_'+k, c?'0':'1'); fetch(CLOUD, {method:"POST", mode:"no-cors", body:JSON.stringify({key:'mark_'+k, val:c?'0':'1'})}); renderAll(); }
-
-    let startX = 0, isDragging = false;
-    document.getElementById('viewport').ontouchstart = (e) => { startX = e.touches[0].clientX; isDragging = true; };
-    document.getElementById('viewport').ontouchmove = (e) => { if(isDragging) setPos(((e.touches[0].clientX - startX)/viewport.clientWidth)*100); };
-    document.getElementById('viewport').ontouchend = (e) => {
-      isDragging = false;
-      const diff = e.changedTouches[0].clientX - startX;
-      if (Math.abs(diff) < 50) setPos(0, 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)');
-      else {
-        setPos(diff > 0 ? 100 : -100, 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)');
-        setTimeout(() => {
-          if (diff > 0) { baseDate.setMonth(baseDate.getMonth()-1); map = [map[2], map[0], map[1]]; }
-          else { baseDate.setMonth(baseDate.getMonth()+1); map = [map[1], map[2], map[0]]; }
-          renderAll();
-        }, 250);
+        document.querySelectorAll(`.cell-preview[data-key="${activeEditKey}"]`).forEach(el => {
+          el.innerText = val;
+        });
       }
-    };
+      activeEditKey = null;
+    }
 
-    panels.forEach(createLayout);
+    modalTextarea.addEventListener('input', () => {
+      if (!activeEditKey) return;
+      const val = modalTextarea.value;
+      const key = `note_${activeEditKey}`;
+      localStorage.setItem(key, val);
+      
+      document.querySelectorAll(`.cell-preview[data-key="${activeEditKey}"]`).forEach(el => {
+        el.innerText = val;
+      });
+
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+    });
+
+    viewport.addEventListener('input', (e) => {
+      const target = e.target;
+      if (target.classList.contains('monthly-note-textarea')) {
+        const key = target.getAttribute('data-monthkey');
+        const val = target.value;
+        localStorage.setItem(key, val);
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => syncToCloud(key, val), 800);
+      }
+    });
+
+    viewport.addEventListener('click', (e) => {
+      const markTarget = e.target.closest('.mark-btn');
+      if (markTarget) {
+        const rawKey = markTarget.getAttribute('data-key');
+        if (!rawKey) return;
+        const key = `mark_${rawKey}`;
+        markTarget.classList.toggle('checked');
+        const val = markTarget.classList.contains('checked') ? '1' : '0';
+        localStorage.setItem(key, val);
+        syncToCloud(key, val);
+        return;
+      }
+
+      const cellTarget = e.target.closest('.day-cell');
+      if (cellTarget && !cellTarget.classList.contains('empty-cell')) {
+        const dateKey = cellTarget.getAttribute('data-datekey');
+        if (dateKey) openEditor(dateKey);
+      }
+    });
+
+    // 100% 保留 v14 觸控邏輯
+    let startX = 0, startY = 0, currentX = 0;
+    let isDragging = false, isHorizontal = null;
+    let trackWidth = 0;
+
+    viewport.addEventListener('touchstart', (e) => {
+      if (isTransitioning) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      currentX = startX;
+      isDragging = true;
+      isHorizontal = null;
+      trackWidth = viewport.clientWidth;
+      setPanelPositions(0, 'none');
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', (e) => {
+      if (!isDragging || isTransitioning) return;
+      currentX = e.touches[0].clientX;
+      const diffX = currentX - startX;
+      const diffY = e.touches[0].clientY - startY;
+
+      if (isHorizontal === null) {
+        if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
+          isHorizontal = Math.abs(diffX) > Math.abs(diffY);
+        }
+      }
+
+      if (isHorizontal) {
+        if (e.cancelable) e.preventDefault();
+        const percent = (diffX / trackWidth) * 100;
+        setPanelPositions(percent, 'none');
+      }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', () => {
+      if (!isDragging || !isHorizontal || isTransitioning) {
+        isDragging = false;
+        return;
+      }
+      isDragging = false;
+      
+      const diffX = currentX - startX;
+      const threshold = trackWidth * 0.10;
+      const animCurve = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
+
+      if (diffX > threshold) {
+        isTransitioning = true;
+        panels[map[0]].className = 'month-view active-month';
+        panels[map[1]].className = 'month-view';
+        setPanelPositions(100, animCurve);
+
+        setTimeout(() => {
+          baseDate.setMonth(baseDate.getMonth() - 1);
+          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
+
+          const oldRight = map[2];
+          map = [oldRight, map[0], map[1]];
+
+          const newPrevDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
+          populateMonthData(panels[map[0]], newPrevDate);
+          panels[map[0]].className = 'month-view';
+
+          setPanelPositions(0, 'none');
+          isTransitioning = false;
+        }, 250);
+      } else if (diffX < -threshold) {
+        isTransitioning = true;
+        panels[map[2]].className = 'month-view active-month';
+        panels[map[1]].className = 'month-view';
+        setPanelPositions(-100, animCurve);
+
+        setTimeout(() => {
+          baseDate.setMonth(baseDate.getMonth() + 1);
+          monthTitle.innerText = `${baseDate.getFullYear()} 年 ${baseDate.getMonth() + 1} 月`;
+
+          const oldLeft = map[0];
+          map = [map[1], map[2], oldLeft];
+
+          const newNextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+          populateMonthData(panels[map[2]], newNextDate);
+          panels[map[2]].className = 'month-view';
+
+          setPanelPositions(0, 'none');
+          isTransitioning = false;
+        }, 250);
+      } else {
+        setPanelPositions(0, animCurve);
+      }
+    });
+
+    panels.forEach(initMonthViewSkeleton);
     renderAll();
+    fetchCloudData();
   </script>
 </body>
 </html>
